@@ -20,37 +20,30 @@ textarea {
 
 button {
   padding:10px 20px;
-  margin:10px;
+  margin:5px;
   border-radius:10px;
   border:none;
 }
 
-#bracket {
-  display:flex;
-  overflow-x:auto;
-  padding:20px;
-  align-items:center;
-}
-
-.round {
-  display:flex;
-  flex-direction:column;
-  justify-content:space-around;
-  margin:0 30px;
-}
-
-.match {
+#wrap {
   position:relative;
-  margin:25px 0;
+  overflow:auto;
+}
+
+#bracket {
+  position:relative;
+  padding:40px;
+  min-width:900px;
 }
 
 .player {
+  position:absolute;
+  width:120px;
+  height:36px;
+  line-height:36px;
   background:#1f8f2e;
-  margin:6px 0;
-  padding:10px;
-  border-radius:8px;
+  border-radius:6px;
   cursor:pointer;
-  transition:0.2s;
 }
 
 .player:hover {
@@ -62,20 +55,11 @@ button {
   color:black;
 }
 
-.connector {
+svg {
   position:absolute;
-  right:-30px;
-  top:50%;
-  width:30px;
-  height:2px;
-  background:white;
-}
-
-.vertical {
-  position:absolute;
-  right:-30px;
-  width:2px;
-  background:white;
+  top:0;
+  left:0;
+  pointer-events:none;
 }
 
 #result {
@@ -98,20 +82,28 @@ button {
 玩家6
 玩家7
 玩家8
-</textarea>
-
-<br>
+</textarea><br>
 
 <button onclick="start()">開始</button>
 <button onclick="undo()">撤回</button>
 
-<div id="bracket"></div>
+<div id="wrap">
+  <div id="bracket"></div>
+  <svg id="lines"></svg>
+</div>
 
 <div id="result"></div>
 
 <script>
 let rounds = [];
 let history = [];
+let semiLosers = [];
+let thirdMatch = ["",""];
+
+const BOX_W = 120;
+const BOX_H = 36;
+const GAP_Y = 20;
+const ROUND_GAP = 180;
 
 function start() {
   let players = document.getElementById("players").value
@@ -119,107 +111,167 @@ function start() {
     .map(p=>p.trim())
     .filter(p=>p);
 
+  if (players.length < 2) return;
+
   players = shuffle(players);
 
   rounds = [players];
   history = [];
+  semiLosers = [];
+  thirdMatch = ["",""];
 
-  buildNextRounds(players.length);
-  render();
-}
-
-function buildNextRounds(n) {
+  let n = players.length;
   while (n > 1) {
-    n = Math.ceil(n/2);
-    rounds.push(new Array(n).fill(null));
+    n = n / 2;
+    rounds.push(new Array(n).fill(""));
   }
+
+  render();
 }
 
 function render() {
-  let bracket = document.getElementById("bracket");
+  const bracket = document.getElementById("bracket");
+  const svg = document.getElementById("lines");
+
   bracket.innerHTML = "";
+  svg.innerHTML = "";
 
-  rounds.forEach((round, rIndex)=>{
-    let roundDiv = document.createElement("div");
-    roundDiv.className = "round";
+  let totalHeight = calcHeight(rounds[0].length);
 
-    let title = document.createElement("h3");
-    title.innerText = "第 " + (rIndex+1) + " 輪";
-    roundDiv.appendChild(title);
+  svg.setAttribute("width", 2000);
+  svg.setAttribute("height", totalHeight);
 
-    for (let i=0;i<round.length;i+=2) {
-      let match = document.createElement("div");
-      match.className="match";
+  rounds.forEach((round, r)=>{
+    for (let i=0;i<round.length;i++){
+      let x = r * ROUND_GAP;
+      let spacing = Math.pow(2, r)*(BOX_H+GAP_Y);
+      let y = i * spacing + spacing/2;
 
-      let p1 = createPlayer(round[i], rIndex, i);
-      let p2 = createPlayer(round[i+1], rIndex, i+1);
+      let div = document.createElement("div");
+      div.className="player";
+      div.style.left = x + "px";
+      div.style.top = y + "px";
+      div.innerText = round[i] || "-";
 
-      match.appendChild(p1);
-      match.appendChild(p2);
+      if (round[i]) {
+        div.onclick = ()=>{
+          history.push(JSON.stringify({
+            rounds,
+            semiLosers,
+            thirdMatch
+          }));
 
-      // 畫橫線
-      let line = document.createElement("div");
-      line.className="connector";
-      match.appendChild(line);
+          let winner = round[i];
+          let loser = round[i%2===0 ? i+1 : i-1];
 
-      roundDiv.appendChild(match);
+          rounds[r+1][Math.floor(i/2)] = winner;
+
+          // ⭐ 四強敗者
+          if (r === rounds.length-3) {
+            semiLosers.push(loser);
+            if (semiLosers.length===2){
+              thirdMatch = [...semiLosers];
+            }
+          }
+
+          render();
+        };
+      }
+
+      bracket.appendChild(div);
+
+      // 畫線
+      if (r < rounds.length-1) {
+        let nextX = (r+1)*ROUND_GAP;
+        let nextIndex = Math.floor(i/2);
+        let nextSpacing = Math.pow(2,r+1)*(BOX_H+GAP_Y);
+        let nextY = nextIndex*nextSpacing + nextSpacing/2;
+
+        drawLine(svg, x+BOX_W, y+BOX_H/2, nextX, nextY+BOX_H/2);
+      }
     }
-
-    bracket.appendChild(roundDiv);
   });
 
-  checkResult();
-}
+  // 🥉 季軍戰
+  if (thirdMatch[0] && thirdMatch[1]) {
+    let r = rounds.length;
 
-function createPlayer(name, r, i) {
-  let div = document.createElement("div");
-  div.className="player";
-  div.innerText = name || "-";
+    thirdMatch.forEach((name,i)=>{
+      let x = r * ROUND_GAP;
+      let y = i*120 + 100;
 
-  if (!name) return div;
+      let div = document.createElement("div");
+      div.className="player";
+      div.style.left = x+"px";
+      div.style.top = y+"px";
+      div.innerText = name;
 
-  div.onclick = ()=>{
-    history.push(JSON.stringify(rounds));
+      div.onclick = ()=>{
+        updateResult(name);
+      };
 
-    let nextIndex = Math.floor(i/2);
-    rounds[r+1][nextIndex] = name;
-
-    render();
-  };
-
-  return div;
-}
-
-function checkResult() {
-  let last = rounds[rounds.length-1];
-
-  if (last[0]) {
-    let champion = last[0];
-
-    let semi = rounds[rounds.length-2];
-
-    let runnerUp = semi.find(p=>p && p!==champion);
-
-    let thirdRound = rounds[rounds.length-3] || [];
-    let third = thirdRound.find(p=>p && p!==champion && p!==runnerUp);
-
-    document.getElementById("result").innerHTML = `
-      🥇 冠軍：${champion}<br>
-      🥈 亞軍：${runnerUp || "-"}<br>
-      🥉 季軍：${third || "-"}
-    `;
+      bracket.appendChild(div);
+    });
   }
+
+  updateResult();
 }
 
-function undo() {
-  if (history.length===0) return;
+function updateResult(thirdWinner=null){
+  let final = rounds[rounds.length-1];
 
-  rounds = JSON.parse(history.pop());
+  if (!final[0]) return;
+
+  let champion = final[0];
+  let runner = rounds[rounds.length-2].find(p=>p && p!==champion);
+
+  let html = `
+    🥇 冠軍：${champion}<br>
+    🥈 亞軍：${runner}
+  `;
+
+  if (thirdWinner){
+    html += `<br>🥉 季軍：${thirdWinner}`;
+  }
+
+  document.getElementById("result").innerHTML = html;
+}
+
+function drawLine(svg,x1,y1,x2,y2){
+  let path = document.createElementNS("http://www.w3.org/2000/svg","path");
+
+  let midX = (x1+x2)/2;
+
+  let d = `
+    M ${x1} ${y1}
+    L ${midX} ${y1}
+    L ${midX} ${y2}
+    L ${x2} ${y2}
+  `;
+
+  path.setAttribute("d",d);
+  path.setAttribute("stroke","white");
+  path.setAttribute("fill","none");
+  path.setAttribute("stroke-width","2");
+
+  svg.appendChild(path);
+}
+
+function undo(){
+  if (!history.length) return;
+  let state = JSON.parse(history.pop());
+  rounds = state.rounds;
+  semiLosers = state.semiLosers;
+  thirdMatch = state.thirdMatch;
   render();
 }
 
-function shuffle(arr) {
-  for (let i=arr.length-1;i>0;i--) {
+function calcHeight(n){
+  return n*(BOX_H+GAP_Y)*2;
+}
+
+function shuffle(arr){
+  for (let i=arr.length-1;i>0;i--){
     let j=Math.floor(Math.random()*(i+1));
     [arr[i],arr[j]]=[arr[j],arr[i]];
   }
