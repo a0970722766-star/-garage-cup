@@ -7,96 +7,80 @@
 
 <style>
 body {
-  font-family: sans-serif;
-  background: #000;
-  color: #fff;
-  text-align: center;
+  background:#000;
+  color:#fff;
+  font-family:sans-serif;
+  text-align:center;
 }
 
 textarea {
-  width: 90%;
-  max-width: 400px;
-  height: 150px;
-  margin: 20px;
+  width:90%;
+  height:120px;
 }
 
 button {
-  padding: 10px 20px;
-  margin: 10px;
-  font-size: 16px;
-  border-radius: 10px;
+  padding:10px 20px;
+  margin:10px;
+  border-radius:10px;
+  border:none;
 }
 
 #bracket {
-  display: flex;
-  gap: 60px;
-  overflow-x: auto;
-  padding: 20px;
-  align-items: center;
+  display:flex;
+  overflow-x:auto;
+  padding:20px;
+  align-items:center;
 }
 
 .round {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 40px;
-  position: relative;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-around;
+  margin:0 30px;
 }
 
 .match {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  position: relative;
-  align-items: center;
+  position:relative;
+  margin:25px 0;
 }
 
-/* 玩家 */
 .player {
-  background: green;
-  padding: 12px 20px;
-  cursor: pointer;
-  border-radius: 8px;
-  min-width: 100px;
-  text-align: center;
-  font-size: clamp(12px, 2vw, 16px);
+  background:#1f8f2e;
+  margin:6px 0;
+  padding:10px;
+  border-radius:8px;
+  cursor:pointer;
+  transition:0.2s;
 }
 
 .player:hover {
-  background: limegreen;
+  background:#27c93f;
 }
 
 .winner {
-  background: gold !important;
-  color: black;
+  background:gold;
+  color:black;
 }
 
-/* 橫線 */
-.match::after {
-  content: "";
-  position: absolute;
-  right: -30px;
-  top: 50%;
-  width: 30px;
-  height: 2px;
-  background: white;
+.connector {
+  position:absolute;
+  right:-30px;
+  top:50%;
+  width:30px;
+  height:2px;
+  background:white;
 }
 
-/* 直線 */
-.match::before {
-  content: "";
-  position: absolute;
-  right: -30px;
-  top: 0;
-  width: 2px;
-  height: 100%;
-  background: white;
+.vertical {
+  position:absolute;
+  right:-30px;
+  width:2px;
+  background:white;
 }
 
-/* 最後一輪不要線 */
-.round:last-child .match::before,
-.round:last-child .match::after {
-  display: none;
+#result {
+  margin-top:20px;
+  font-size:20px;
 }
 </style>
 </head>
@@ -119,100 +103,127 @@ button {
 <br>
 
 <button onclick="start()">開始</button>
-<button onclick="reset()">撤回</button>
+<button onclick="undo()">撤回</button>
 
 <div id="bracket"></div>
 
+<div id="result"></div>
+
 <script>
 let rounds = [];
-let currentRound = 0;
+let history = [];
 
 function start() {
   let players = document.getElementById("players").value
     .split("\n")
-    .map(p => p.trim())
-    .filter(p => p !== "");
-
-  if (players.length < 2) return alert("至少2人");
+    .map(p=>p.trim())
+    .filter(p=>p);
 
   players = shuffle(players);
 
-  if (players.length % 2 !== 0) players.push("輪空");
-
   rounds = [players];
-  currentRound = 0;
+  history = [];
 
+  buildNextRounds(players.length);
   render();
 }
 
-function render() {
-  let container = document.getElementById("bracket");
-  container.innerHTML = "";
+function buildNextRounds(n) {
+  while (n > 1) {
+    n = Math.ceil(n/2);
+    rounds.push(new Array(n).fill(null));
+  }
+}
 
-  rounds.forEach((roundPlayers, roundIndex) => {
+function render() {
+  let bracket = document.getElementById("bracket");
+  bracket.innerHTML = "";
+
+  rounds.forEach((round, rIndex)=>{
     let roundDiv = document.createElement("div");
     roundDiv.className = "round";
 
     let title = document.createElement("h3");
-    title.innerText = "第 " + (roundIndex + 1) + " 輪";
+    title.innerText = "第 " + (rIndex+1) + " 輪";
     roundDiv.appendChild(title);
 
-    for (let i = 0; i < roundPlayers.length; i += 2) {
-      let p1 = roundPlayers[i];
-      let p2 = roundPlayers[i + 1];
-
+    for (let i=0;i<round.length;i+=2) {
       let match = document.createElement("div");
-      match.className = "match";
+      match.className="match";
 
-      let btn1 = createPlayer(p1, roundIndex, i);
-      let btn2 = createPlayer(p2, roundIndex, i + 1);
+      let p1 = createPlayer(round[i], rIndex, i);
+      let p2 = createPlayer(round[i+1], rIndex, i+1);
 
-      match.appendChild(btn1);
-      match.appendChild(btn2);
+      match.appendChild(p1);
+      match.appendChild(p2);
+
+      // 畫橫線
+      let line = document.createElement("div");
+      line.className="connector";
+      match.appendChild(line);
 
       roundDiv.appendChild(match);
     }
 
-    container.appendChild(roundDiv);
+    bracket.appendChild(roundDiv);
   });
+
+  checkResult();
 }
 
-function createPlayer(name, roundIndex, playerIndex) {
-  let btn = document.createElement("div");
-  btn.className = "player";
-  btn.innerText = name;
+function createPlayer(name, r, i) {
+  let div = document.createElement("div");
+  div.className="player";
+  div.innerText = name || "-";
 
-  btn.onclick = () => {
-    if (roundIndex !== currentRound) return;
+  if (!name) return div;
 
-    let next = rounds[roundIndex + 1] || [];
-    next[Math.floor(playerIndex / 2)] = name;
-    rounds[roundIndex + 1] = next;
+  div.onclick = ()=>{
+    history.push(JSON.stringify(rounds));
 
-    btn.classList.add("winner");
-
-    if (next.filter(Boolean).length === rounds[roundIndex].length / 2) {
-      currentRound++;
-    }
+    let nextIndex = Math.floor(i/2);
+    rounds[r+1][nextIndex] = name;
 
     render();
   };
 
-  return btn;
+  return div;
+}
+
+function checkResult() {
+  let last = rounds[rounds.length-1];
+
+  if (last[0]) {
+    let champion = last[0];
+
+    let semi = rounds[rounds.length-2];
+
+    let runnerUp = semi.find(p=>p && p!==champion);
+
+    let thirdRound = rounds[rounds.length-3] || [];
+    let third = thirdRound.find(p=>p && p!==champion && p!==runnerUp);
+
+    document.getElementById("result").innerHTML = `
+      🥇 冠軍：${champion}<br>
+      🥈 亞軍：${runnerUp || "-"}<br>
+      🥉 季軍：${third || "-"}
+    `;
+  }
+}
+
+function undo() {
+  if (history.length===0) return;
+
+  rounds = JSON.parse(history.pop());
+  render();
 }
 
 function shuffle(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    let j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+  for (let i=arr.length-1;i>0;i--) {
+    let j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
   }
   return arr;
-}
-
-function reset() {
-  document.getElementById("bracket").innerHTML = "";
-  rounds = [];
-  currentRound = 0;
 }
 </script>
 
