@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>車庫大賽</title>
+
+<style>
+body {
+  font-family: sans-serif;
+  background: #000;
+  color: #fff;
+  text-align: center;
+  padding: 20px;
+}
+
+textarea {
+  width: 90%;
+  max-width: 400px;
+  height: 150px;
+  margin: 20px 0;
+}
+
+button {
+  padding: 10px 20px;
+  margin: 10px;
+  font-size: 16px;
+}
+
+.match {
+  background: green;
+  margin: 5px;
+  padding: 10px;
+}
+
+.round {
+  margin-top: 20px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🏆 車庫大賽</h1>
+
+<textarea id="players">
+玩家1
+玩家2
+玩家3
+玩家4
+玩家5
+玩家6
+玩家7
+玩家8
+</textarea>
+
+<br>
+
+<button onclick="start()">開始</button>
+<button onclick="reset()">撤回</button>
+
+<div id="bracket"></div>
+
+<script>
+let history = [];
+
+function start() {
+  let players = document.getElementById("players").value
+    .split("\n")
+    .map(p => p.trim())
+    .filter(p => p !== "");
+
+  if (players.length < 2) {
+    alert("至少要2人");
+    return;
+  }
+
+  history.push([...players]);
+
+  players = shuffle(players);
+
+  if (players.length % 2 !== 0) {
+    players.push("輪空");
+  }
+
+  render(players);
+}
+
+function reset() {
+  if (history.length > 0) {
+    let last = history.pop();
+    document.getElementById("players").value = last.join("\n");
+    document.getElementById("bracket").innerHTML = "";
+  }
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    let j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function render(players) {
+  let container = document.getElementById("bracket");
+  container.innerHTML = "";
+
+  let round = 1;
+
+  while (players.length > 1) {
+    let roundDiv = document.createElement("div");
+    roundDiv.className = "round";
+    roundDiv.innerHTML = "<h3>第 " + round + " 輪</h3>";
+
+    let nextRound = [];
+
+    for (let i = 0; i < players.length; i += 2) {
+      let p1 = players[i];
+      let p2 = players[i + 1];
+
+      let match = document.createElement("div");
+      match.className = "match";
+      match.innerText = p1 + " vs " + p2;
+
+      roundDiv.appendChild(match);
+
+      nextRound.push("勝者");
+    }
+
+    container.appendChild(roundDiv);
+
+    players = nextRound;
+    round++;
+  }
+}
+</script>
+
+</body>
+</html>
