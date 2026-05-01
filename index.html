@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>車庫大賽｜賽程系統</title>
+
+<style>
+body {
+  font-family: sans-serif;
+  background: #111;
+  color: white;
+  text-align: center;
+}
+
+textarea {
+  width: 90%;
+  max-width: 400px;
+  height: 120px;
+}
+
+button {
+  margin: 5px;
+  padding: 10px;
+}
+
+.bracket {
+  display: flex;
+  overflow-x: auto;
+}
+
+.round {
+  margin: 10px;
+}
+
+.player {
+  border: 1px solid #555;
+  padding: 5px;
+  margin: 5px;
+  cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🏆 車庫大賽</h1>
+
+<textarea id="players">
+玩家1
+玩家2
+玩家3
+玩家4
+玩家5
+玩家6
+玩家7
+玩家8
+</textarea><br>
+
+<button onclick="start()">開始</button>
+
+<div id="bracket" class="bracket"></div>
+<div id="winner"></div>
+
+<script>
+function start() {
+  let players = document.getElementById("players").value.split("\n");
+  let container = document.getElementById("bracket");
+  container.innerHTML = "";
+  nextRound(players);
+}
+
+function nextRound(players) {
+  if (players.length === 1) {
+    document.getElementById("winner").innerHTML = "🏆 冠軍：" + players[0];
+    return;
+  }
+
+  let round = document.createElement("div");
+  round.className = "round";
+
+  let winners = [];
+
+  for (let i = 0; i < players.length; i += 2) {
+    let match = document.createElement("div");
+
+    [players[i], players[i+1]].forEach(p => {
+      let div = document.createElement("div");
+      div.className = "player";
+      div.innerText = p;
+
+      div.onclick = () => {
+        winners.push(p);
+        div.style.background = "green";
+
+        if (winners.length === players.length / 2) {
+          setTimeout(() => nextRound(winners), 500);
+        }
+      };
+
+      match.appendChild(div);
+    });
+
+    round.appendChild(match);
+  }
+
+  document.getElementById("bracket").appendChild(round);
+}
+</script>
+
+</body>
+</html>
