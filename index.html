@@ -6,276 +6,189 @@
 <title>車庫大賽</title>
 
 <style>
-body {
-  background:#000;
-  color:#fff;
-  font-family:sans-serif;
-  text-align:center;
-}
-
-textarea {
-  width:90%;
-  height:120px;
-}
-
-button {
-  padding:10px 20px;
-  margin:5px;
-  border-radius:10px;
-  border:none;
-}
-
-#wrap {
-  position:relative;
-  overflow:auto;
-}
-
-#bracket {
-  position:relative;
-  padding:40px;
-  min-width:900px;
-}
-
-.player {
+body{margin:0;background:#000;color:#fff;font-family:sans-serif;text-align:center;overflow:hidden;}
+#viewport{width:100vw;height:80vh;overflow:hidden;touch-action:none;position:relative;}
+#stage{position:absolute;transform-origin:0 0;}
+.node{
   position:absolute;
-  width:120px;
-  height:36px;
-  line-height:36px;
-  background:#1f8f2e;
-  border-radius:6px;
+  width:130px;height:40px;
+  background:#1fae2f;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
   cursor:pointer;
 }
-
-.player:hover {
-  background:#27c93f;
-}
-
-.winner {
-  background:gold;
-  color:black;
-}
-
-svg {
-  position:absolute;
-  top:0;
-  left:0;
-  pointer-events:none;
-}
-
-#result {
-  margin-top:20px;
-  font-size:20px;
-}
+.node:hover{background:#28d943;}
+.winner{background:gold;color:#000;}
+svg{position:absolute;top:0;left:0;pointer-events:none;}
+button{margin:10px;padding:10px 20px;border-radius:10px;border:none;}
 </style>
 </head>
 
 <body>
 
-<h1>🏆 車庫大賽</h1>
-
-<textarea id="players">
-玩家1
-玩家2
-玩家3
-玩家4
-玩家5
-玩家6
-玩家7
-玩家8
-</textarea><br>
-
+<h2>🏆 車庫大賽</h2>
 <button onclick="start()">開始</button>
 <button onclick="undo()">撤回</button>
 
-<div id="wrap">
-  <div id="bracket"></div>
-  <svg id="lines"></svg>
+<div id="viewport">
+  <div id="stage">
+    <svg id="lines"></svg>
+    <div id="nodes"></div>
+  </div>
 </div>
 
 <div id="result"></div>
 
 <script>
-let rounds = [];
-let history = [];
-let semiLosers = [];
-let thirdMatch = ["",""];
+let rounds=[],history=[],semiLosers=[],thirdMatch=["",""];
 
-const BOX_W = 120;
-const BOX_H = 36;
-const GAP_Y = 20;
-const ROUND_GAP = 180;
+const BOX_W=130, BOX_H=40, GAP_X=180, GAP_Y=20;
 
-function start() {
-  let players = document.getElementById("players").value
-    .split("\n")
-    .map(p=>p.trim())
-    .filter(p=>p);
+function start(){
+  let players=["玩家1","玩家2","玩家3","玩家4","玩家5","玩家6","玩家7","玩家8"];
+  rounds=[players];
+  history=[];semiLosers=[];thirdMatch=["",""];
 
-  if (players.length < 2) return;
-
-  players = shuffle(players);
-
-  rounds = [players];
-  history = [];
-  semiLosers = [];
-  thirdMatch = ["",""];
-
-  let n = players.length;
-  while (n > 1) {
-    n = n / 2;
-    rounds.push(new Array(n).fill(""));
-  }
+  let n=players.length;
+  while(n>1){n/=2;rounds.push(new Array(n).fill(""));}
 
   render();
 }
 
-function render() {
-  const bracket = document.getElementById("bracket");
-  const svg = document.getElementById("lines");
+function render(){
+  const nodes=document.getElementById("nodes");
+  const svg=document.getElementById("lines");
+  nodes.innerHTML=""; svg.innerHTML="";
 
-  bracket.innerHTML = "";
-  svg.innerHTML = "";
+  rounds.forEach((round,r)=>{
+    round.forEach((p,i)=>{
+      let x=r*GAP_X;
+      let spacing=Math.pow(2,r)*(BOX_H+GAP_Y);
+      let y=i*spacing+spacing/2;
 
-  let totalHeight = calcHeight(rounds[0].length);
+      let div=document.createElement("div");
+      div.className="node";
+      div.style.left=x+"px";
+      div.style.top=y+"px";
+      div.innerText=p||"-";
 
-  svg.setAttribute("width", 2000);
-  svg.setAttribute("height", totalHeight);
+      if(p){
+        div.onclick=()=>{
+          history.push(JSON.stringify({rounds,semiLosers,thirdMatch}));
 
-  rounds.forEach((round, r)=>{
-    for (let i=0;i<round.length;i++){
-      let x = r * ROUND_GAP;
-      let spacing = Math.pow(2, r)*(BOX_H+GAP_Y);
-      let y = i * spacing + spacing/2;
+          let winner=p;
+          let loser=round[i%2===0?i+1:i-1];
 
-      let div = document.createElement("div");
-      div.className="player";
-      div.style.left = x + "px";
-      div.style.top = y + "px";
-      div.innerText = round[i] || "-";
+          rounds[r+1][Math.floor(i/2)]=winner;
 
-      if (round[i]) {
-        div.onclick = ()=>{
-          history.push(JSON.stringify({
-            rounds,
-            semiLosers,
-            thirdMatch
-          }));
-
-          let winner = round[i];
-          let loser = round[i%2===0 ? i+1 : i-1];
-
-          rounds[r+1][Math.floor(i/2)] = winner;
-
-          // ⭐ 四強敗者
-          if (r === rounds.length-3) {
+          if(r===rounds.length-3){
             semiLosers.push(loser);
-            if (semiLosers.length===2){
-              thirdMatch = [...semiLosers];
-            }
+            if(semiLosers.length===2) thirdMatch=[...semiLosers];
           }
 
           render();
         };
       }
 
-      bracket.appendChild(div);
+      nodes.appendChild(div);
 
-      // 畫線
-      if (r < rounds.length-1) {
-        let nextX = (r+1)*ROUND_GAP;
-        let nextIndex = Math.floor(i/2);
-        let nextSpacing = Math.pow(2,r+1)*(BOX_H+GAP_Y);
-        let nextY = nextIndex*nextSpacing + nextSpacing/2;
+      if(r<rounds.length-1){
+        let nextX=(r+1)*GAP_X;
+        let nextIndex=Math.floor(i/2);
+        let nextSpacing=Math.pow(2,r+1)*(BOX_H+GAP_Y);
+        let nextY=nextIndex*nextSpacing+nextSpacing/2;
 
-        drawLine(svg, x+BOX_W, y+BOX_H/2, nextX, nextY+BOX_H/2);
+        draw(svg,x+BOX_W,y+BOX_H/2,nextX,nextY+BOX_H/2);
       }
-    }
+    });
   });
 
-  // 🥉 季軍戰
-  if (thirdMatch[0] && thirdMatch[1]) {
-    let r = rounds.length;
+  // 季軍賽
+  if(thirdMatch[0]&&thirdMatch[1]){
+    let r=rounds.length;
+    thirdMatch.forEach((p,i)=>{
+      let x=r*GAP_X;
+      let y=200+i*120;
 
-    thirdMatch.forEach((name,i)=>{
-      let x = r * ROUND_GAP;
-      let y = i*120 + 100;
+      let div=document.createElement("div");
+      div.className="node";
+      div.style.left=x+"px";
+      div.style.top=y+"px";
+      div.innerText=p;
 
-      let div = document.createElement("div");
-      div.className="player";
-      div.style.left = x+"px";
-      div.style.top = y+"px";
-      div.innerText = name;
+      div.onclick=()=>updateResult(p);
 
-      div.onclick = ()=>{
-        updateResult(name);
-      };
-
-      bracket.appendChild(div);
+      nodes.appendChild(div);
     });
   }
 
   updateResult();
 }
 
-function updateResult(thirdWinner=null){
-  let final = rounds[rounds.length-1];
-
-  if (!final[0]) return;
-
-  let champion = final[0];
-  let runner = rounds[rounds.length-2].find(p=>p && p!==champion);
-
-  let html = `
-    🥇 冠軍：${champion}<br>
-    🥈 亞軍：${runner}
-  `;
-
-  if (thirdWinner){
-    html += `<br>🥉 季軍：${thirdWinner}`;
-  }
-
-  document.getElementById("result").innerHTML = html;
-}
-
-function drawLine(svg,x1,y1,x2,y2){
-  let path = document.createElementNS("http://www.w3.org/2000/svg","path");
-
-  let midX = (x1+x2)/2;
-
-  let d = `
-    M ${x1} ${y1}
-    L ${midX} ${y1}
-    L ${midX} ${y2}
-    L ${x2} ${y2}
-  `;
-
+function draw(svg,x1,y1,x2,y2){
+  let path=document.createElementNS("http://www.w3.org/2000/svg","path");
+  let mid=(x1+x2)/2;
+  let d=`M${x1},${y1} L${mid},${y1} L${mid},${y2} L${x2},${y2}`;
   path.setAttribute("d",d);
   path.setAttribute("stroke","white");
   path.setAttribute("fill","none");
   path.setAttribute("stroke-width","2");
-
   svg.appendChild(path);
 }
 
+function updateResult(third=null){
+  let final=rounds[rounds.length-1];
+  if(!final[0]) return;
+
+  let champ=final[0];
+  let runner=rounds[rounds.length-2].find(p=>p&&p!==champ);
+
+  let html=`🥇 ${champ}<br>🥈 ${runner}`;
+  if(third) html+=`<br>🥉 ${third}`;
+  document.getElementById("result").innerHTML=html;
+}
+
 function undo(){
-  if (!history.length) return;
-  let state = JSON.parse(history.pop());
-  rounds = state.rounds;
-  semiLosers = state.semiLosers;
-  thirdMatch = state.thirdMatch;
+  if(!history.length)return;
+  let s=JSON.parse(history.pop());
+  rounds=s.rounds;semiLosers=s.semiLosers;thirdMatch=s.thirdMatch;
   render();
 }
 
-function calcHeight(n){
-  return n*(BOX_H+GAP_Y)*2;
-}
+/* 🔥 拖動+縮放 */
+let scale=1,pos={x:0,y:0},drag=false,startPos={};
+const stage=document.getElementById("stage"),vp=document.getElementById("viewport");
 
-function shuffle(arr){
-  for (let i=arr.length-1;i>0;i--){
-    let j=Math.floor(Math.random()*(i+1));
-    [arr[i],arr[j]]=[arr[j],arr[i]];
+vp.addEventListener("touchstart",e=>{
+  if(e.touches.length===1){
+    drag=true;
+    startPos.x=e.touches[0].clientX-pos.x;
+    startPos.y=e.touches[0].clientY-pos.y;
   }
-  return arr;
+});
+
+vp.addEventListener("touchmove",e=>{
+  if(e.touches.length===1&&drag){
+    pos.x=e.touches[0].clientX-startPos.x;
+    pos.y=e.touches[0].clientY-startPos.y;
+    updateTransform();
+  }
+});
+
+let last=0;
+vp.addEventListener("touchmove",e=>{
+  if(e.touches.length===2){
+    let dx=e.touches[0].clientX-e.touches[1].clientX;
+    let dy=e.touches[0].clientY-e.touches[1].clientY;
+    let d=Math.sqrt(dx*dx+dy*dy);
+    if(last){scale*=d/last;scale=Math.max(.5,Math.min(2.5,scale));updateTransform();}
+    last=d;
+  }
+});
+
+vp.addEventListener("touchend",()=>{drag=false;last=0;});
+
+function updateTransform(){
+  stage.style.transform=`translate(${pos.x}px,${pos.y}px) scale(${scale})`;
 }
 </script>
 
