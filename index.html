@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>車庫大賽 Pro</title>
+<title>車庫大賽 Ultimate</title>
 
 <style>
 body{
@@ -10,76 +10,65 @@ body{
   background:#000;
   color:#fff;
   font-family:sans-serif;
-  text-align:center;
 }
 
-h1{margin:20px}
+h1{text-align:center;}
 
 .controls{
-  display:flex;
-  justify-content:center;
-  gap:10px;
-  flex-wrap:wrap;
+  text-align:center;
+  margin:10px;
 }
 
 textarea{
   width:90%;
-  height:120px;
+  height:100px;
+  margin:auto;
+  display:block;
   border-radius:10px;
-  padding:10px;
 }
 
-button,select{
-  padding:10px 14px;
-  border-radius:10px;
-  border:none;
-}
-
-#viewport{
+#view{
+  overflow:auto;
   width:100%;
   height:70vh;
-  overflow:auto;
-  border-top:1px solid #333;
 }
 
-#stage{
+#bracket{
   position:relative;
-  transform-origin:0 0;
 }
 
 .match{
   position:absolute;
-  width:150px;
 }
 
 .player{
-  background:#1f9d3a;
-  margin:5px 0;
+  background:#2ecc71;
   padding:8px;
+  margin:4px 0;
   border-radius:8px;
   cursor:pointer;
+  width:140px;
+  text-align:center;
 }
 
-.win{background:#4caf50}
-.lose{background:#444}
+.win{background:#00c853;}
+.lose{background:#444;}
 
 svg{
   position:absolute;
   top:0;
   left:0;
-  pointer-events:none;
 }
-
 .result{
+  text-align:center;
   margin:20px;
-  font-size:18px;
 }
 </style>
 </head>
 
 <body>
 
-<h1>🏆 車庫大賽 Pro</h1>
+<h1>🏆 車庫大賽 Ultimate</h1>
 
 <div class="controls">
 <select id="mode">
@@ -92,8 +81,6 @@ svg{
 
 <button onclick="start()">開始</button>
 <button onclick="undo()">撤回</button>
-<button onclick="zoom(1.2)">放大</button>
-<button onclick="zoom(0.8)">縮小</button>
 </div>
 
 <textarea id="input">玩家1
@@ -105,8 +92,8 @@ svg{
 玩家7
 玩家8</textarea>
 
-<div id="viewport">
-  <div id="stage"></div>
+<div id="view">
+  <div id="bracket"></div>
   <svg id="lines"></svg>
 </div>
 
@@ -115,120 +102,102 @@ svg{
 <script>
 let rounds=[];
 let history=[];
-let scale=1;
-
-function zoom(s){
-  scale*=s;
-  stage.style.transform=`scale(${scale})`;
-}
-
-function undo(){
-  let last=history.pop();
-  if(!last) return;
-  last.match.winner=null;
-  propagate();
-  render();
-}
 
 function start(){
   let names=input.value.split("\n").filter(x=>x.trim());
-  let mode=parseInt(document.getElementById("mode").value);
+  let mode=parseInt(modeSelect.value);
 
   while(names.length<mode){
     names.push("玩家"+(names.length+1));
   }
 
-  rounds = build(names,mode);
-  history=[];
-  render();
-}
+  rounds=[];
+  let current=[...names];
 
-function build(players,mode){
-  let r=[];
-  let cur=[...players];
   let is48 = mode===48;
 
   while(true){
 
-    if(is48 && cur.length===3){
-      r.push({type:"final3",players:[...cur]});
+    if(is48 && current.length===3){
+      rounds.push({type:"final3",players:[...current]});
       break;
     }
 
-    if(!is48 && cur.length===1) break;
+    if(!is48 && current.length===1) break;
 
-    let matches=[];
+    let r=[];
     let next=[];
 
-    for(let i=0;i<cur.length;i+=2){
-      let p1=cur[i];
-      let p2=cur[i+1] || null;
-
-      matches.push({p1,p2,winner:null,loser:null});
+    for(let i=0;i<current.length;i+=2){
+      let m={
+        p1:current[i],
+        p2:current[i+1]||null,
+        winner:null,
+        loser:null
+      };
+      r.push(m);
       next.push(null);
     }
 
-    r.push(matches);
-    cur=next;
+    rounds.push(r);
+    current=next;
   }
 
-  return r;
+  render();
 }
 
 function render(){
-  stage.innerHTML="";
+  bracket.innerHTML="";
   lines.innerHTML="";
 
   let colW=220;
-  let rowH=120;
+  let rowH=100;
 
   rounds.forEach((round,ri)=>{
 
     if(round.type==="final3"){
-      drawFinal3(round);
+      renderFinal3(round);
       return;
     }
 
     round.forEach((m,mi)=>{
       let x=ri*colW;
-      let y=mi*rowH;
+      let y=mi*rowH*Math.pow(2,ri);
 
       let div=document.createElement("div");
       div.className="match";
       div.style.left=x+"px";
       div.style.top=y+"px";
 
-      let p1=createPlayer(m,0);
-      let p2=createPlayer(m,1);
+      let p1=create(m,"p1");
+      let p2=create(m,"p2");
 
       div.appendChild(p1);
       div.appendChild(p2);
-      stage.appendChild(div);
+      bracket.appendChild(div);
 
       // 畫線
       if(ri>0){
-        let prevIndex=Math.floor(mi/2);
+        let prev=Math.floor(mi/2);
 
-        drawLine(
-          (ri-1)*colW+150,
-          prevIndex*rowH+30,
-          x,
-          y+30
-        );
+        let y1=prev*rowH*Math.pow(2,ri-1)+20;
+        let y2=y+20;
+
+        drawLine(x-70,y1,x,y2);
       }
     });
   });
 
-  stage.style.width=(rounds.length*240)+"px";
-  stage.style.height="2000px";
+  bracket.style.width=(rounds.length*240)+"px";
+  bracket.style.height="2000px";
 }
 
-function createPlayer(m,side){
+function create(m,key){
   let div=document.createElement("div");
   div.className="player";
 
-  let name = side===0?m.p1:m.p2;
-  div.innerText=name || "?";
+  let name=m[key];
+  div.innerText=name||"?";
 
   if(m.winner){
     if(m.winner===name) div.classList.add("win");
@@ -239,29 +208,27 @@ function createPlayer(m,side){
     if(!name) return;
 
     m.winner=name;
-    m.loser= side===0?m.p2:m.p1;
+    m.loser = key==="p1"?m.p2:m.p1;
 
-    history.push({match:m});
-    propagate();
+    history.push(m);
+
+    update();
     render();
-  };
+  }
 
   return div;
 }
 
 function drawLine(x1,y1,x2,y2){
   let path=document.createElementNS("http://www.w3.org/2000/svg","path");
-
-  let d=`M${x1} ${y1} H${(x1+x2)/2} V${y2} H${x2}`;
-
+  let d=`M${x1} ${y1} H${x2-30} V${y2} H${x2}`;
   path.setAttribute("d",d);
   path.setAttribute("stroke","#fff");
   path.setAttribute("fill","none");
-
   lines.appendChild(path);
 }
 
-function propagate(){
+function update(){
   for(let i=0;i<rounds.length-1;i++){
     let r=rounds[i];
     let n=rounds[i+1];
@@ -271,69 +238,74 @@ function propagate(){
     r.forEach((m,mi)=>{
       if(m.winner){
         let idx=Math.floor(mi/2);
-        let slot=mi%2===0?"p1":"p2";
+        let slot = mi%2===0?"p1":"p2";
         n[idx][slot]=m.winner;
       }
     });
   }
 
-  handleFinal();
+  calcResult();
 }
 
-function handleFinal(){
+function calcResult(){
   let last=rounds[rounds.length-1];
 
   if(last.type==="final3") return;
 
   if(last.length===1 && last[0].winner){
-
     let champ=last[0].winner;
     let runner=last[0].loser;
 
     let semi=rounds[rounds.length-2];
-    let losers=semi.map(m=>m.loser).filter(Boolean);
+    let a=semi[0].loser;
+    let b=semi[1].loser;
 
-    if(losers.length===2){
-      result.innerHTML=`
-      🥇 ${champ}<br>
-      🥈 ${runner}<br>
-      🥉 ${losers[0]} vs ${losers[1]}
-      `;
-    }
+    result.innerHTML=`
+    🥇 ${champ}<br>
+    🥈 ${runner}<br>
+    🥉 <button onclick="pickThird('${a}','${b}')">${a} vs ${b}</button>
+    `;
   }
 }
 
-let finalScore={};
+function pickThird(a,b){
+  let win=confirm(`選 ${a}? 取消=選 ${b}`)?a:b;
+  result.innerHTML+=`<br>🥉 ${win}`;
+}
 
-function drawFinal3(r){
+function renderFinal3(r){
   let p=r.players;
 
-  if(p.includes(null)){
-    result.innerHTML="等待產生三強";
-    return;
-  }
-
   result.innerHTML=`
-  🥇🥈🥉 三人循環<br><br>
-  <div onclick="pick('${p[0]}','${p[1]}')">${p[0]} vs ${p[1]}</div>
-  <div onclick="pick('${p[1]}','${p[2]}')">${p[1]} vs ${p[2]}</div>
-  <div onclick="pick('${p[0]}','${p[2]}')">${p[0]} vs ${p[2]}</div>
+  🥇🥈🥉 三人循環<br>
+  <button onclick="score('${p[0]}','${p[1]}')">${p[0]} vs ${p[1]}</button><br>
+  <button onclick="score('${p[1]}','${p[2]}')">${p[1]} vs ${p[2]}</button><br>
+  <button onclick="score('${p[0]}','${p[2]}')">${p[0]} vs ${p[2]}</button>
   `;
 }
 
-function pick(a,b){
-  let win = confirm(`確定 ${a} 勝？取消=${b}`) ? a : b;
-  finalScore[win]=(finalScore[win]||0)+1;
+let scoreBoard={};
 
-  if(Object.values(finalScore).reduce((a,b)=>a+b,0)>=3){
-    let sorted=Object.entries(finalScore).sort((a,b)=>b[1]-a[1]);
+function score(a,b){
+  let w=confirm(`選 ${a}? 取消=${b}`)?a:b;
+  scoreBoard[w]=(scoreBoard[w]||0)+1;
 
+  if(Object.values(scoreBoard).reduce((a,b)=>a+b,0)>=3){
+    let s=Object.entries(scoreBoard).sort((a,b)=>b[1]-a[1]);
     result.innerHTML=`
-    🥇 ${sorted[0][0]}<br>
-    🥈 ${sorted[1]?.[0]||"-"}<br>
-    🥉 ${sorted[2]?.[0]||"-"}
+    🥇 ${s[0][0]}<br>
+    🥈 ${s[1][0]}<br>
+    🥉 ${s[2][0]}
     `;
   }
+}
+
+function undo(){
+  let m=history.pop();
+  if(!m) return;
+  m.winner=null;
+  update();
+  render();
 }
 </script>
 
