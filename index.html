@@ -4,191 +4,284 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>車庫大賽</title>
-
 <style>
-body{margin:0;background:#000;color:#fff;font-family:sans-serif;text-align:center;overflow:hidden;}
-#viewport{width:100vw;height:80vh;overflow:hidden;touch-action:none;position:relative;}
+body{margin:0;background:#000;color:#fff;font-family:sans-serif;overflow:hidden;}
+h1{text-align:center;}
+
+#inputBox{
+  width:90%;margin:10px auto;display:block;height:140px;
+}
+
+.controls{text-align:center;}
+button{margin:8px;padding:10px 18px;border-radius:12px;border:none;}
+
+#viewport{
+  width:100vw;height:65vh;overflow:hidden;touch-action:none;position:relative;
+}
 #stage{position:absolute;transform-origin:0 0;}
+#bracket{position:relative;padding:120px;}
+
 .node{
-  position:absolute;
-  width:130px;height:40px;
-  background:#1fae2f;border-radius:8px;
+  position:absolute;width:140px;height:44px;
+  background:#1fae2f;border-radius:10px;
   display:flex;align-items:center;justify-content:center;
   cursor:pointer;
 }
-.node:hover{background:#28d943;}
-.winner{background:gold;color:#000;}
-svg{position:absolute;top:0;left:0;pointer-events:none;}
-button{margin:10px;padding:10px 20px;border-radius:10px;border:none;}
+.node.empty{background:#444;}
+
+.line{position:absolute;background:#fff;}
+.thirdTitle{
+  position:absolute;color:#ffcc00;font-weight:bold;
+}
 </style>
 </head>
 
 <body>
 
-<h2>🏆 車庫大賽</h2>
-<button onclick="start()">開始</button>
-<button onclick="undo()">撤回</button>
+<h1>🏆 車庫大賽</h1>
+
+<textarea id="inputBox">
+玩家1
+玩家2
+玩家3
+玩家4
+玩家5
+玩家6
+玩家7
+玩家8
+</textarea>
+
+<div class="controls">
+  <button onclick="start()">開始</button>
+  <button onclick="undo()">撤回</button>
+</div>
 
 <div id="viewport">
   <div id="stage">
-    <svg id="lines"></svg>
-    <div id="nodes"></div>
+    <div id="bracket"></div>
   </div>
 </div>
 
-<div id="result"></div>
-
 <script>
-let rounds=[],history=[],semiLosers=[],thirdMatch=["",""];
+let history=[];
+let state=null;
 
-const BOX_W=130, BOX_H=40, GAP_X=180, GAP_Y=20;
+let scale=1,pos={x:50,y:50};
+const stage=document.getElementById("stage");
+const viewport=document.getElementById("viewport");
 
-function start(){
-  let players=["玩家1","玩家2","玩家3","玩家4","玩家5","玩家6","玩家7","玩家8"];
-  rounds=[players];
-  history=[];semiLosers=[];thirdMatch=["",""];
+/* ===== 拖曳 + 縮放 ===== */
+let dragging=false,startPos={};
 
-  let n=players.length;
-  while(n>1){n/=2;rounds.push(new Array(n).fill(""));}
-
-  render();
-}
-
-function render(){
-  const nodes=document.getElementById("nodes");
-  const svg=document.getElementById("lines");
-  nodes.innerHTML=""; svg.innerHTML="";
-
-  rounds.forEach((round,r)=>{
-    round.forEach((p,i)=>{
-      let x=r*GAP_X;
-      let spacing=Math.pow(2,r)*(BOX_H+GAP_Y);
-      let y=i*spacing+spacing/2;
-
-      let div=document.createElement("div");
-      div.className="node";
-      div.style.left=x+"px";
-      div.style.top=y+"px";
-      div.innerText=p||"-";
-
-      if(p){
-        div.onclick=()=>{
-          history.push(JSON.stringify({rounds,semiLosers,thirdMatch}));
-
-          let winner=p;
-          let loser=round[i%2===0?i+1:i-1];
-
-          rounds[r+1][Math.floor(i/2)]=winner;
-
-          if(r===rounds.length-3){
-            semiLosers.push(loser);
-            if(semiLosers.length===2) thirdMatch=[...semiLosers];
-          }
-
-          render();
-        };
-      }
-
-      nodes.appendChild(div);
-
-      if(r<rounds.length-1){
-        let nextX=(r+1)*GAP_X;
-        let nextIndex=Math.floor(i/2);
-        let nextSpacing=Math.pow(2,r+1)*(BOX_H+GAP_Y);
-        let nextY=nextIndex*nextSpacing+nextSpacing/2;
-
-        draw(svg,x+BOX_W,y+BOX_H/2,nextX,nextY+BOX_H/2);
-      }
-    });
-  });
-
-  // 季軍賽
-  if(thirdMatch[0]&&thirdMatch[1]){
-    let r=rounds.length;
-    thirdMatch.forEach((p,i)=>{
-      let x=r*GAP_X;
-      let y=200+i*120;
-
-      let div=document.createElement("div");
-      div.className="node";
-      div.style.left=x+"px";
-      div.style.top=y+"px";
-      div.innerText=p;
-
-      div.onclick=()=>updateResult(p);
-
-      nodes.appendChild(div);
-    });
-  }
-
-  updateResult();
-}
-
-function draw(svg,x1,y1,x2,y2){
-  let path=document.createElementNS("http://www.w3.org/2000/svg","path");
-  let mid=(x1+x2)/2;
-  let d=`M${x1},${y1} L${mid},${y1} L${mid},${y2} L${x2},${y2}`;
-  path.setAttribute("d",d);
-  path.setAttribute("stroke","white");
-  path.setAttribute("fill","none");
-  path.setAttribute("stroke-width","2");
-  svg.appendChild(path);
-}
-
-function updateResult(third=null){
-  let final=rounds[rounds.length-1];
-  if(!final[0]) return;
-
-  let champ=final[0];
-  let runner=rounds[rounds.length-2].find(p=>p&&p!==champ);
-
-  let html=`🥇 ${champ}<br>🥈 ${runner}`;
-  if(third) html+=`<br>🥉 ${third}`;
-  document.getElementById("result").innerHTML=html;
-}
-
-function undo(){
-  if(!history.length)return;
-  let s=JSON.parse(history.pop());
-  rounds=s.rounds;semiLosers=s.semiLosers;thirdMatch=s.thirdMatch;
-  render();
-}
-
-/* 🔥 拖動+縮放 */
-let scale=1,pos={x:0,y:0},drag=false,startPos={};
-const stage=document.getElementById("stage"),vp=document.getElementById("viewport");
-
-vp.addEventListener("touchstart",e=>{
+viewport.addEventListener("touchstart",e=>{
   if(e.touches.length===1){
-    drag=true;
+    dragging=true;
     startPos.x=e.touches[0].clientX-pos.x;
     startPos.y=e.touches[0].clientY-pos.y;
   }
 });
 
-vp.addEventListener("touchmove",e=>{
-  if(e.touches.length===1&&drag){
+viewport.addEventListener("touchmove",e=>{
+  if(e.touches.length===1 && dragging){
     pos.x=e.touches[0].clientX-startPos.x;
     pos.y=e.touches[0].clientY-startPos.y;
-    updateTransform();
+    update();
   }
 });
 
-let last=0;
-vp.addEventListener("touchmove",e=>{
+let lastDist=0;
+viewport.addEventListener("touchmove",e=>{
   if(e.touches.length===2){
     let dx=e.touches[0].clientX-e.touches[1].clientX;
     let dy=e.touches[0].clientY-e.touches[1].clientY;
-    let d=Math.sqrt(dx*dx+dy*dy);
-    if(last){scale*=d/last;scale=Math.max(.5,Math.min(2.5,scale));updateTransform();}
-    last=d;
+    let dist=Math.sqrt(dx*dx+dy*dy);
+    if(lastDist){
+      scale*=dist/lastDist;
+      scale=Math.max(0.5,Math.min(2.5,scale));
+      update();
+    }
+    lastDist=dist;
   }
 });
 
-vp.addEventListener("touchend",()=>{drag=false;last=0;});
+viewport.addEventListener("touchend",()=>{
+  dragging=false;
+  lastDist=0;
+});
 
-function updateTransform(){
+function update(){
   stage.style.transform=`translate(${pos.x}px,${pos.y}px) scale(${scale})`;
+}
+
+/* ===== 核心 ===== */
+
+function nextPowerOf2(n){
+  return Math.pow(2,Math.ceil(Math.log2(n)));
+}
+
+function start(){
+  let players=document.getElementById("inputBox").value.trim().split("\n");
+  let size=nextPowerOf2(players.length);
+
+  while(players.length<size){
+    players.push(null); // BYE
+  }
+
+  history=[];
+  state=build(players);
+  render();
+}
+
+function undo(){
+  if(history.length){
+    state=history.pop();
+    render();
+  }
+}
+
+function build(players){
+  let rounds=[];
+  let current=players.map(p=>({name:p}));
+
+  while(current.length>1){
+    let round=[];
+    let next=[];
+    for(let i=0;i<current.length;i+=2){
+      let m={
+        p1:current[i],
+        p2:current[i+1],
+        winner:null,
+        loser:null
+      };
+      round.push(m);
+      next.push({name:null});
+    }
+    rounds.push(round);
+    current=next;
+  }
+
+  return {
+    rounds,
+    thirdMatch:null
+  };
+}
+
+/* ===== 渲染 ===== */
+
+function render(){
+  const b=document.getElementById("bracket");
+  b.innerHTML="";
+
+  const gapX=240;
+  const baseGapY=70;
+
+  let roundGap=(r)=>baseGapY*Math.pow(2,r);
+
+  state.rounds.forEach((round,ri)=>{
+    round.forEach((m,mi)=>{
+
+      let y=mi*roundGap(ri);
+
+      drawNode(m.p1,ri,y,m,"p1");
+      drawNode(m.p2,ri,y+roundGap(ri)/2,m,"p2");
+
+      drawLines(ri,y,roundGap(ri));
+
+      if(m.winner){
+        drawNode({name:m.winner.name},ri+1,y+roundGap(ri)/4,null);
+      }
+    });
+  });
+
+  /* ===== 季軍賽 ===== */
+  let lastRound=state.rounds[state.rounds.length-2];
+  if(lastRound && lastRound.length===2){
+    let l1=lastRound[0].loser;
+    let l2=lastRound[1].loser;
+
+    if(l1 && l2){
+      let x=(state.rounds.length)*240;
+      let y=100;
+
+      drawNode(l1,state.rounds.length,y,null);
+      drawNode(l2,state.rounds.length,y+80,null);
+
+      let title=document.createElement("div");
+      title.className="thirdTitle";
+      title.innerText="季軍賽";
+      title.style.left=x+"px";
+      title.style.top=(y-40)+"px";
+      b.appendChild(title);
+    }
+  }
+
+  update();
+}
+
+/* ===== 畫節點 ===== */
+
+function drawNode(p,ri,y,match,key){
+  let node=document.createElement("div");
+  node.className="node";
+  if(!p || !p.name) node.classList.add("empty");
+
+  node.innerText=p?.name || "—";
+
+  node.style.left=ri*240+"px";
+  node.style.top=y+"px";
+
+  if(match && p && p.name){
+    node.onclick=()=>{
+      history.push(JSON.parse(JSON.stringify(state)));
+
+      match.winner=p;
+      match.loser = (key==="p1")?match.p2:match.p1;
+
+      let next=state.rounds[ri+1];
+      if(next){
+        let target=next[Math.floor(matchIndex(match,ri)/2)];
+        if(!target.p1) target.p1=p;
+        else target.p2=p;
+      }
+
+      render();
+    };
+  }
+
+  document.getElementById("bracket").appendChild(node);
+}
+
+function matchIndex(m,ri){
+  return state.rounds[ri].indexOf(m);
+}
+
+/* ===== 畫線（完全對齊） ===== */
+
+function drawLines(ri,y,gap){
+  const b=document.getElementById("bracket");
+
+  let x=ri*240+140;
+  let midY=y+gap/4;
+
+  /* 上橫 */
+  createLine(x,y+22,40,2);
+
+  /* 下橫 */
+  createLine(x,y+gap/2+22,40,2);
+
+  /* 直線 */
+  createLine(x+40,y+22,2,gap/2);
+
+}
+
+function createLine(x,y,w,h){
+  let l=document.createElement("div");
+  l.className="line";
+  l.style.left=x+"px";
+  l.style.top=y+"px";
+  l.style.width=w+"px";
+  l.style.height=h+"px";
+  document.getElementById("bracket").appendChild(l);
 }
 </script>
 
