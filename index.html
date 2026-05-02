@@ -3,24 +3,81 @@
 <head>
 <meta charset="UTF-8">
 <title>車庫大賽</title>
+
 <style>
-body{margin:0;background:#000;color:#fff;font-family:sans-serif;text-align:center;}
-h1{margin:20px;font-size:36px;}
-textarea{width:85%;height:120px;border-radius:10px;padding:10px;}
-button,select{padding:10px;margin:5px;border-radius:10px;border:none;}
-
-.wrapper{height:65vh;overflow:auto;border-top:1px solid #333;}
-.canvas{position:relative;transform-origin:0 0;}
-
-.box{
-  position:absolute;width:140px;height:44px;
-  background:#1fa22e;border-radius:10px;
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;user-select:none;
+body{
+  margin:0;
+  background:#000;
+  color:#fff;
+  font-family:sans-serif;
+  text-align:center;
 }
-.empty{background:#555;cursor:default;}
-.final{background:#ff9800;}
-.line{position:absolute;background:#fff;}
+
+h1{margin:20px}
+
+.controls{
+  display:flex;
+  gap:10px;
+  justify-content:center;
+  flex-wrap:wrap;
+}
+
+textarea{
+  width:90%;
+  height:120px;
+  margin:10px;
+  border-radius:10px;
+  padding:10px;
+}
+
+button,select{
+  padding:10px 15px;
+  border-radius:10px;
+  border:none;
+}
+
+#wrap{
+  overflow:auto;
+  width:100%;
+  height:70vh;
+  border-top:1px solid #333;
+}
+
+#stage{
+  position:relative;
+  transform-origin:0 0;
+}
+
+.match{
+  position:absolute;
+  width:140px;
+}
+
+.player{
+  background:#1f9d3a;
+  margin:4px 0;
+  padding:8px;
+  border-radius:8px;
+  cursor:pointer;
+}
+
+.player.win{
+  background:#4caf50;
+}
+
+.player.lose{
+  background:#555;
+}
+
+.result{
+  margin-top:20px;
+}
+
+canvas{
+  position:absolute;
+  top:0;
+  left:0;
+}
 </style>
 </head>
 
@@ -28,11 +85,12 @@ button,select{padding:10px;margin:5px;border-radius:10px;border:none;}
 
 <h1>🏆 車庫大賽</h1>
 
-<select id="size">
+<div class="controls">
+<select id="mode">
 <option value="8">8人</option>
 <option value="16">16人</option>
 <option value="32">32人</option>
-<option value="48">48人（特殊賽制）</option>
+<option value="48">48人（循環）</option>
 <option value="64">64人</option>
 </select>
 
@@ -40,237 +98,234 @@ button,select{padding:10px;margin:5px;border-radius:10px;border:none;}
 <button onclick="undo()">撤回</button>
 <button onclick="zoom(1.2)">放大</button>
 <button onclick="zoom(0.8)">縮小</button>
-
-<br><br>
-
-<textarea id="players" placeholder="一行一個玩家"></textarea>
-
-<div class="wrapper">
-  <div id="canvas" class="canvas"></div>
 </div>
 
+<textarea id="input">玩家1
+玩家2
+玩家3
+玩家4
+玩家5
+玩家6
+玩家7
+玩家8</textarea>
+
+<div id="wrap">
+  <div id="stage"></div>
+  <canvas id="lines"></canvas>
+</div>
+
+<div class="result" id="result"></div>
+
 <script>
-let rounds=[], history=[], scale=1, final3Results=[];
+let rounds=[];
+let history=[];
+let scale=1;
 
-const $ = id => document.getElementById(id);
+function zoom(s){
+  scale*=s;
+  stage.style.transform=`scale(${scale})`;
+}
 
-/* ===== 初始化 ===== */
-function start(){
-  let size = parseInt($("size").value);
-  let input = $("players").value.trim().split("\n").filter(x=>x.trim()!=="");
-
-  while(input.length < size){
-    input.push("玩家"+(input.length+1));
-  }
-
-  rounds = generateRounds(input);
-  history = [deepCopy(rounds)];
-  final3Results = [];
-
+function undo(){
+  if(history.length===0)return;
+  let last=history.pop();
+  last.match.winner=null;
   render();
 }
 
-/* ===== 工具 ===== */
-function deepCopy(o){ return JSON.parse(JSON.stringify(o)); }
+function start(){
+  let names=input.value.split("\n").filter(x=>x);
+  let mode=parseInt(document.getElementById("mode").value);
 
-function undo(){
-  if(history.length>1){
-    history.pop();
-    rounds = deepCopy(history[history.length-1]);
-    render();
+  if(names.length<mode){
+    for(let i=names.length;i<mode;i++){
+      names.push("玩家"+(i+1));
+    }
   }
+
+  rounds=build(names,mode);
+  history=[];
+  render();
 }
 
-function zoom(f){
-  scale *= f;
-  $("canvas").style.transform = `scale(${scale})`;
-}
+function build(players,mode){
+  let r=[];
+  let cur=[...players];
 
-/* ===== 賽制 ===== */
-function generateRounds(players){
-  let r=[], current=[...players];
-  let is48 = players.length===48;
+  let is48 = mode===48;
 
   while(true){
 
-    if(is48 && current.length===3){
-      r.push({type:"final3",players:current});
+    if(is48 && cur.length===3){
+      r.push({type:"final3",players:[...cur]});
       break;
     }
 
-    if(!is48 && current.length===1){
-      break;
-    }
+    if(!is48 && cur.length<=1) break;
 
     let matches=[];
-    for(let i=0;i<current.length;i+=2){
-      matches.push({
-        p1:current[i] ?? null,
-        p2:current[i+1] ?? null,
-        winner:null,
-        loser:null
-      });
+    let next=[];
+
+    for(let i=0;i<cur.length;i+=2){
+      let p1=cur[i];
+      let p2=cur[i+1] || null;
+
+      matches.push({p1,p2,winner:null,loser:null});
+      next.push(null);
     }
 
     r.push(matches);
-    current = new Array(matches.length).fill(null);
+    cur=next;
   }
 
   return r;
 }
 
-/* ===== 點擊勝者 ===== */
-function pickWinner(r,i,player){
-  if(!player) return;
-
-  let m = rounds[r][i];
-  m.winner = player;
-  m.loser = (m.p1===player)?m.p2:m.p1;
-
-  let next = rounds[r+1];
-
-  if(next && !next.type){
-    let idx = Math.floor(i/2);
-    if(i%2===0) next[idx].p1 = player;
-    else next[idx].p2 = player;
-  }
-
-  history.push(deepCopy(rounds));
-  render();
-}
-
-/* ===== 畫面 ===== */
 function render(){
-  const canvas = $("canvas");
-  canvas.innerHTML="";
+  stage.innerHTML="";
+  let canvas=document.getElementById("lines");
+  let ctx=canvas.getContext("2d");
 
-  let baseGap=70, colWidth=200;
+  let w=200;
+  let h=80;
 
-  canvas.style.width = (rounds.length+3)*colWidth+"px";
-  canvas.style.height = "4000px";
+  canvas.width=3000;
+  canvas.height=2000;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  rounds.forEach((round,r)=>{
+  rounds.forEach((round,ri)=>{
 
     if(round.type==="final3"){
-      drawFinal3(round.players,r);
+      drawFinal3(round,ri);
       return;
     }
 
-    let gap = baseGap*Math.pow(2,r);
+    round.forEach((m,mi)=>{
+      let x=ri*w;
+      let y=mi*h*2;
 
-    round.forEach((m,i)=>{
-      let x=r*colWidth, y=i*gap;
+      let div=document.createElement("div");
+      div.className="match";
+      div.style.left=x+"px";
+      div.style.top=y+"px";
 
-      drawBox(x,y,m.p1,()=>pickWinner(r,i,m.p1));
-      drawBox(x,y+gap/2,m.p2,()=>pickWinner(r,i,m.p2));
+      let p1=document.createElement("div");
+      let p2=document.createElement("div");
 
-      drawLine(x+140,y+22,40,2);
-      drawLine(x+140,y+gap/2+22,40,2);
-      drawLine(x+180,y+22,2,gap/2);
+      p1.className="player";
+      p2.className="player";
+
+      p1.innerText=m.p1 || "?";
+      p2.innerText=m.p2 || "?";
+
+      p1.onclick=()=>select(m,0);
+      p2.onclick=()=>select(m,1);
+
+      if(m.winner){
+        if(m.winner===m.p1){
+          p1.classList.add("win");
+          p2.classList.add("lose");
+        }else{
+          p2.classList.add("win");
+          p1.classList.add("lose");
+        }
+      }
+
+      div.appendChild(p1);
+      div.appendChild(p2);
+      stage.appendChild(div);
+
+      if(ri>0){
+        let prev=rounds[ri-1];
+        let prevIndex=Math.floor(mi/2);
+
+        let px=(ri-1)*w+140;
+        let py=prevIndex*h*2+20;
+
+        let cx=x;
+        let cy=y+20;
+
+        ctx.beginPath();
+        ctx.moveTo(px,py);
+        ctx.lineTo(cx,cy);
+        ctx.strokeStyle="#fff";
+        ctx.stroke();
+      }
     });
   });
-
-  drawRanking();
 }
 
-/* ===== UI元件 ===== */
-function drawBox(x,y,name,click){
-  let d=document.createElement("div");
-  d.className="box";
-  d.style.left=x+"px";
-  d.style.top=y+"px";
+function select(match,side){
+  let winner = side===0?match.p1:match.p2;
+  let loser  = side===0?match.p2:match.p1;
 
-  if(name===null || name===undefined || name===""){
-    d.classList.add("empty");
-    d.innerText="—";
-  }else{
-    d.innerText=name;
-    d.onclick=click;
+  if(!winner) return;
+
+  match.winner=winner;
+  match.loser=loser;
+
+  history.push({match});
+
+  propagate();
+  render();
+}
+
+function propagate(){
+  for(let i=0;i<rounds.length-1;i++){
+    let round=rounds[i];
+    let next=rounds[i+1];
+
+    if(next.type==="final3") continue;
+
+    round.forEach((m,mi)=>{
+      if(m.winner){
+        let idx=Math.floor(mi/2);
+        let slot=mi%2===0?"p1":"p2";
+        next[idx][slot]=m.winner;
+      }
+    });
   }
 
-  $("canvas").appendChild(d);
+  handleFinals();
 }
 
-function drawLine(x,y,w,h){
-  let l=document.createElement("div");
-  l.className="line";
-  l.style.left=x+"px";
-  l.style.top=y+"px";
-  l.style.width=w+"px";
-  l.style.height=h+"px";
-  $("canvas").appendChild(l);
-}
-
-/* ===== 48人最終 ===== */
-function drawFinal3(players,r){
-  let x=r*200;
-
-  let match=[
-    [players[0],players[1]],
-    [players[1],players[2]],
-    [players[0],players[2]]
-  ];
-
-  match.forEach((m,i)=>{
-    let d=document.createElement("div");
-    d.className="box final";
-    d.style.left=x+"px";
-    d.style.top=(i*80+100)+"px";
-    d.innerText=`${m[0]} vs ${m[1]}`;
-
-    d.onclick=()=>{
-      let winner = m[0]; // 點擊即選左邊，可改成選單
-      final3Results.push(winner);
-      if(final3Results.length===3) calcFinal3();
-    };
-
-    $("canvas").appendChild(d);
-  });
-}
-
-function calcFinal3(){
-  let score={};
-  final3Results.forEach(p=>score[p]=(score[p]||0)+1);
-
-  let rank=Object.entries(score).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
-  showRank(rank);
-}
-
-/* ===== 正常賽制排名 ===== */
-function drawRanking(){
-  let last = rounds[rounds.length-1];
+function handleFinals(){
+  let last=rounds[rounds.length-1];
   if(last.type==="final3") return;
 
-  let finalMatch = rounds[rounds.length-1][0];
-  if(!finalMatch.winner) return;
+  if(last.length===1 && last[0].winner){
+    let champion=last[0].winner;
+    let runner=last[0].loser;
 
-  let semi = rounds[rounds.length-2];
+    let semi=rounds[rounds.length-2];
 
-  let third=[semi[0].loser,semi[1].loser];
-  let x=rounds.length*200;
+    let losers=[];
+    semi.forEach(m=>{
+      if(m.loser) losers.push(m.loser);
+    });
 
-  createRank("🥇 "+finalMatch.winner,0,x);
-  createRank("🥈 "+finalMatch.loser,1,x);
-
-  let d=createRank(`${third[0]} vs ${third[1]}`,2,x);
-  d.onclick=()=> d.innerText="🥉 "+third[0];
+    if(losers.length===2){
+      let div=document.getElementById("result");
+      div.innerHTML=`
+      🥇 ${champion}<br>
+      🥈 ${runner}<br>
+      🥉 ${losers[0]} vs ${losers[1]}
+      `;
+    }
+  }
 }
 
-function createRank(text,i,x){
-  let d=document.createElement("div");
-  d.className="box final";
-  d.style.left=x+"px";
-  d.style.top=(i*80+100)+"px";
-  d.innerText=text;
-  $("canvas").appendChild(d);
-  return d;
-}
+function drawFinal3(round,ri){
+  let div=document.getElementById("result");
 
-function showRank(rank){
-  let x=rounds.length*200;
-  ["🥇"+rank[0],"🥈"+rank[1],"🥉"+rank[2]].forEach((t,i)=>{
-    createRank(t,i,x);
-  });
+  let p=round.players;
+
+  div.innerHTML=`
+  🥇🥈🥉 三人循環賽<br><br>
+  ${p[0]} vs ${p[1]}<br>
+  ${p[1]} vs ${p[2]}<br>
+  ${p[0]} vs ${p[2]}
+  `;
 }
 </script>
 
