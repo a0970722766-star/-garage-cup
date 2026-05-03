@@ -2,33 +2,37 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>車庫大賽 穩定版</title>
+<title>車庫大賽 最終版</title>
 
 <style>
-body{margin:0;background:#000;color:#fff;font-family:sans-serif;}
-h1{text-align:center;margin:20px;}
-textarea{width:90%;height:120px;margin:auto;display:block;border-radius:10px;}
-.controls{text-align:center;margin:10px;}
-button,select{padding:8px;border-radius:8px;margin:5px;}
+body{margin:0;background:#000;color:#fff;font-family:sans-serif;text-align:center;}
+h1{margin:20px;}
+textarea{width:90%;height:120px;border-radius:10px;margin:10px;}
+button,select{padding:8px 12px;margin:5px;border-radius:8px;border:none;}
 
 #view{overflow:auto;height:70vh;}
 #bracket{position:relative;transform-origin:0 0;}
 .match{position:absolute;}
 
 .player{
-  background:#2ecc71;
-  padding:10px;
-  margin:5px 0;
-  border-radius:10px;
-  cursor:pointer;
   width:140px;
-  text-align:center;
+  padding:8px;
+  margin:4px 0;
+  border-radius:8px;
+  background:#2ecc71;
+  cursor:pointer;
 }
-
 .win{background:#00c853;}
 .lose{background:#444;}
 
-svg{position:absolute;top:0;left:0;}
+svg{
+  position:absolute;
+  top:0;
+  left:0;
+  pointer-events:none;
+}
+
+.result{margin:20px;font-size:18px;}
 </style>
 </head>
 
@@ -36,18 +40,17 @@ svg{position:absolute;top:0;left:0;}
 
 <h1>🏆 車庫大賽</h1>
 
-<div class="controls">
 <select id="mode">
-<option value="8">8</option>
-<option value="16">16</option>
-<option value="32">32</option>
-<option value="48">48</option>
-<option value="64">64</option>
+<option value="8">8人</option>
+<option value="16">16人</option>
+<option value="32">32人</option>
+<option value="48">48人（循環）</option>
+<option value="64">64人</option>
 </select>
 
+<br>
 <button onclick="start()">開始</button>
 <button onclick="undo()">撤回</button>
-</div>
 
 <textarea id="input">玩家1
 玩家2
@@ -63,38 +66,201 @@ svg{position:absolute;top:0;left:0;}
   <svg id="lines"></svg>
 </div>
 
-<div id="result" style="text-align:center;margin:20px;"></div>
+<div id="result" class="result"></div>
 
 <script>
-window.start = function(){
+const input=document.getElementById("input");
+const bracket=document.getElementById("bracket");
+const lines=document.getElementById("lines");
+const result=document.getElementById("result");
+const modeSelect=document.getElementById("mode");
 
-  const input = document.getElementById("input");
-  const bracket = document.getElementById("bracket");
+let rounds=[],history=[],scoreBoard={};
 
-  let names = input.value.split("\n").filter(x=>x.trim());
+window.start=function(){
+  let names=input.value.split("\n").filter(x=>x.trim());
+  let mode=parseInt(modeSelect.value);
 
-  if(names.length < 2){
-    alert("至少2人");
-    return;
+  while(names.length<mode){
+    names.push("玩家"+(names.length+1));
   }
 
-  bracket.innerHTML="";
+  rounds=[];
+  history=[];
+  scoreBoard={};
 
-  names.forEach((n,i)=>{
-    let div=document.createElement("div");
-    div.className="player";
-    div.innerText=n;
-    div.style.position="absolute";
-    div.style.left="50px";
-    div.style.top=(i*60)+"px";
-    bracket.appendChild(div);
-  });
+  if(mode===48){
+    build48(names);
+  }else{
+    buildNormal(names);
+  }
 
-  console.log("start OK");
+  render();
 }
 
-window.undo = function(){
-  alert("撤回測試OK");
+function buildNormal(players){
+  let cur=[...players];
+  while(cur.length>1){
+    let r=[],next=[];
+    for(let i=0;i<cur.length;i+=2){
+      r.push({p1:cur[i],p2:cur[i+1],winner:null,loser:null});
+      next.push(null);
+    }
+    rounds.push(r);
+    cur=next;
+  }
+}
+
+function build48(players){
+  let cur=[...players];
+  while(cur.length>3){
+    let r=[],next=[];
+    for(let i=0;i<cur.length;i+=2){
+      r.push({p1:cur[i],p2:cur[i+1],winner:null,loser:null});
+      next.push(null);
+    }
+    rounds.push(r);
+    cur=next;
+  }
+  rounds.push({type:"final3",players:cur});
+}
+
+function render(){
+  bracket.innerHTML="";
+  lines.innerHTML="";
+  result.innerHTML="";
+
+  let colW=220,rowH=90;
+
+  rounds.forEach((round,ri)=>{
+    if(round.type==="final3"){
+      renderFinal3(round);
+      return;
+    }
+
+    round.forEach((m,mi)=>{
+      let x=ricolW;
+      let y=mirowHMath.pow(2,ri);
+
+      let div=document.createElement("div");
+      div.className="match";
+      div.style.left=x+"px";
+      div.style.top=y+"px";
+
+      div.appendChild(createPlayer(m,"p1"));
+      div.appendChild(createPlayer(m,"p2"));
+      bracket.appendChild(div);
+
+      if(ri>0){
+        let prev=Math.floor(mi/2);
+        drawLine(
+          x-60,
+          prevrowHMath.pow(2,ri-1)+20,
+          x,
+          y+20
+        );
+      }
+    });
+  });
+
+  bracket.style.width=(rounds.length240)+"px";
+  bracket.style.height="2000px";
+}
+
+function createPlayer(m,key){
+  let div=document.createElement("div");
+  div.className="player";
+  let name=m[key];
+  div.innerText=name||"?";
+
+  if(m.winner){
+    if(name===m.winner) div.classList.add("win");
+    else div.classList.add("lose");
+  }
+
+  div.onclick=()=>{
+    if(!name) return;
+    m.winner=name;
+    m.loser=(key==="p1"?m.p2:m.p1);
+    history.push(m);
+    update();
+    render();
+  }
+
+  return div;
+}
+
+function drawLine(x1,y1,x2,y2){
+  let p=document.createElementNS("http://www.w3.org/2000/svg","path");
+  p.setAttribute("d",M${x1} ${y1} H${x2-30} V${y2} H${x2});
+  p.setAttribute("stroke","#fff");
+  p.setAttribute("fill","none");
+  lines.appendChild(p);
+}
+
+function update(){
+  for(let i=0;i<rounds.length-1;i++){
+    let r=rounds[i];
+    let n=rounds[i+1];
+
+    if(n.type==="final3") continue;
+
+    r.forEach((m,mi)=>{
+      if(m.winner){
+        let idx=Math.floor(mi/2);
+        let slot=(mi%2===0?"p1":"p2");
+        n[idx][slot]=m.winner;
+      }
+    });
+  }
+
+  calcResult();
+}
+
+function calcResult(){
+  let last=rounds[rounds.length-1];
+  if(last.type==="final3") return;
+
+  if(last.length===1 && last[0].winner){
+    let champ=last[0].winner;
+    let runner=last[0].loser;
+
+    let semi=rounds[rounds.length-2];
+    let a=semi[0].loser;
+    let b=semi[1].loser;
+
+    result.innerHTML=    🥇 ${champ}<br>     🥈 ${runner}<br>     🥉 <button onclick="pickThird('${a}','${b}')">${a} vs ${b}</button>    ;
+  }
+}
+
+window.pickThird=function(a,b){
+  let win=confirm(選 ${a}? 取消=${b})?a:b;
+  result.innerHTML+=<br>🥉 ${win};
+}
+
+function renderFinal3(r){
+  let p=r.players;
+  scoreBoard={};
+
+  result.innerHTML=  🏆 三人循環賽<br><br>   <button onclick="score('${p[0]}','${p[1]}')">${p[0]} vs ${p[1]}</button><br>   <button onclick="score('${p[1]}','${p[2]}')">${p[1]} vs ${p[2]}</button><br>   <button onclick="score('${p[0]}','${p[2]}')">${p[0]} vs ${p[2]}</button>  ;
+}
+
+window.score=function(a,b){
+  let w=confirm(選 ${a}? 取消=${b})?a:b;
+  scoreBoard[w]=(scoreBoard[w]||0)+1;
+
+  if(Object.values(scoreBoard).reduce((a,b)=>a+b,0)>=3){
+    let s=Object.entries(scoreBoard).sort((a,b)=>b[1]-a[1]);
+    result.innerHTML=    🥇 ${s[0][0]}<br>     🥈 ${s[1][0]}<br>     🥉 ${s[2][0]}    ;
+  }
+}
+
+window.undo=function(){
+  let m=history.pop();
+  if(!m) return;
+  m.winner=null;
+  update();
+  render();
 }
 </script>
 
