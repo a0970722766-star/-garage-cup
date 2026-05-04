@@ -29,12 +29,10 @@ button,select{
 
 #view{
   overflow:auto;
-  height:70vh;
+  height:90vh;
   border-top:1px solid #333;
-}
-
-#bracket{
-  position:relative;
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap;
 }
 
 .match{
@@ -54,10 +52,25 @@ button,select{
 .lose{background:#444;}
 
 svg{
-  position:absolute;
-  top:0;
-  left:0;
   pointer-events:none;
+}
+#stage{
+  position: relative;
+  width: max-content;
+}
+
+#lines{
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+}
+
+#bracket{
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
 }
 </style>
 </head>
@@ -88,8 +101,10 @@ svg{
 玩家8</textarea>
 
 <div id="view">
-  <div id="bracket"></div>
-  <svg id="lines"></svg>
+  <div id="stage">
+    <svg id="lines"></svg>
+    <div id="bracket"></div>
+  </div>
 </div>
 
 <script>
@@ -136,13 +151,14 @@ function start(){
 
 function render(){
 
-  let bracket=document.getElementById("bracket");
-  let svg=document.getElementById("lines");
+  let stage = document.getElementById("stage");
+let bracket = document.getElementById("bracket");
+let svg = document.getElementById("lines");
 
   bracket.innerHTML="";
   svg.innerHTML="";
 
-let colW = 220;
+let colW = 260;
 let rowH = 90;
 
 rounds.forEach((round, ri) => {
@@ -153,7 +169,7 @@ rounds.forEach((round, ri) => {
     let x = ri * colW;
 
     // 🔥 核心：置中排列
-    let y = mi * rowH * gap + (rowH * gap / 2);
+    let y = mi * rowH * gap + (rowH * gap / 2) - (rowH / 2);
 
     let div = document.createElement("div");
     div.className = "match";
@@ -169,21 +185,22 @@ rounds.forEach((round, ri) => {
     if (ri > 0) {
       let prevIndex = Math.floor(mi / 2);
 
-      let y1 = prevIndex * rowH * Math.pow(2, ri - 1) + (rowH * Math.pow(2, ri - 1) / 2);
-      let y2 = y;
+      let gapPrev = Math.pow(2, ri - 1);
 
-      drawLine(x - 60, y1 + 16, x, y2 + 16);
+let y1 = prevIndex * rowH * gapPrev + (rowH * gapPrev / 2) - (rowH / 2);
+let y2 = y;
+
+      drawLine(x - 60, y1 + 20, x, y2 + 20);
     }
 
   });
 });
 
-  let width=rounds.length*colW;
-  let height=2000;
+ let width = rounds.length * colW;
+let height = rounds[0].length * rowH * 2;
 
-  bracket.style.width=width+"px";
-  bracket.style.height=height+"px";
-
+  stage.style.width = width + "px";
+stage.style.height = height + "px";
   svg.setAttribute("width",width);
   svg.setAttribute("height",height);
 }
