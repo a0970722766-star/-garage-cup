@@ -2,36 +2,52 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>車庫大賽</title>
+<title>車庫大賽 Pro</title>
 
 <style>
-body{background:#000;color:#fff;text-align:center;font-family:sans-serif;}
-textarea{width:90%;height:120px;margin:10px;border-radius:10px;}
-button{padding:10px;margin:5px;border-radius:10px;border:none;}
+body{margin:0;background:#000;color:#fff;font-family:sans-serif;text-align:center;}
+h1{margin:20px;}
+textarea{width:90%;height:120px;border-radius:10px;margin:10px;}
+button,select{padding:8px;margin:5px;border-radius:8px;border:none;}
 
-.match{margin:10px;}
+#view{overflow:auto;height:65vh;border-top:1px solid #333;}
+#bracket{position:relative;transform-origin:0 0;}
+
 .player{
-  display:inline-block;
-  padding:10px 20px;
-  margin:5px;
+  width:140px;
+  padding:8px;
+  margin:4px;
+  border-radius:8px;
   background:#2ecc71;
-  border-radius:10px;
   cursor:pointer;
 }
 .win{background:#00c853;}
 .lose{background:#444;}
+
+.match{position:absolute;}
 </style>
 </head>
 
 <body>
 
-<h1>🏆 車庫大賽</h1>
+<h1>🏆 車庫大賽 Pro</h1>
 
-<button id="start">開始</button>
+<select id="mode">
+<option value="8">8人</option>
+<option value="16">16人</option>
+<option value="32">32人</option>
+<option value="48">48人(特殊)</option>
+<option value="64">64人</option>
+</select>
 
 <br>
 
-<textarea id="players">玩家1
+<button id="start">開始</button>
+<button id="undo">撤回</button>
+<button id="zoomIn">放大</button>
+<button id="zoomOut">縮小</button>
+
+<textarea id="input">玩家1
 玩家2
 玩家3
 玩家4
@@ -40,56 +56,173 @@ button{padding:10px;margin:5px;border-radius:10px;border:none;}
 玩家7
 玩家8</textarea>
 
-<div id="game"></div>
+<div id="view">
+  <div id="bracket"></div>
+</div>
+
+<div id="result"></div>
 
 <script>
-const startBtn = document.getElementById("start");
-const game = document.getElementById("game");
+let rounds=[],history=[],scale=1;
 
-startBtn.addEventListener("click", function(){
+/* ===== 開始 ===== /
+document.getElementById("start").onclick=()=>{
+  let names=document.getElementById("input").value.split("\n").filter(x=>x.trim());
+  let size=parseInt(document.getElementById("mode").value);
 
-  let text = document.getElementById("players").value;
-  let list = text.split("\n").filter(x=>x.trim());
-
-  game.innerHTML="";
-
-  for(let i=0;i<list.length;i+=2){
-
-    let div = document.createElement("div");
-    div.className="match";
-
-    let p1 = createPlayer(list[i]);
-    let p2 = createPlayer(list[i+1]);
-
-    div.appendChild(p1);
-    div.appendChild(p2);
-
-    game.appendChild(div);
+  while(names.length<size){
+    names.push("玩家"+(names.length+1));
   }
 
-});
+  rounds=[];history=[];
 
-function createPlayer(name){
+  if(size===48){
+    build48(names);
+  }else{
+    buildNormal(names);
+  }
 
-  let div = document.createElement("div");
-  div.className="player";
-  div.innerText = name || "空";
+  render();
+};
 
-  div.onclick = function(){
-    let parent = div.parentElement;
+/ ===== 一般淘汰 ===== /
+function buildNormal(names){
+  let cur=[...names];
 
-    [...parent.children].forEach(x=>{
-      x.classList.remove("win");
-      x.classList.remove("lose");
-      x.classList.add("lose");
+  while(cur.length>1){
+    let r=[],next=[];
+    for(let i=0;i<cur.length;i+=2){
+      r.push({p1:cur[i],p2:cur[i+1],winner:null});
+      next.push(null);
+    }
+    rounds.push(r);
+    cur=next;
+  }
+}
+
+/ ===== 48人賽制 ===== /
+function build48(names){
+  let cur=[...names];
+
+  while(cur.length>3){
+    let r=[],next=[];
+    for(let i=0;i<cur.length;i+=2){
+      r.push({p1:cur[i],p2:cur[i+1],winner:null});
+      next.push(null);
+    }
+    rounds.push(r);
+    cur=next;
+  }
+
+  rounds.push([
+    {p1:null,p2:null,winner:null},
+    {p1:null,p2:null,winner:null},
+    {p1:null,p2:null,winner:null}
+  ]);
+}
+
+/ ===== 渲染 ===== /
+function render(){
+  const b=document.getElementById("bracket");
+  b.innerHTML="";
+  document.getElementById("result").innerHTML="";
+
+  let colW=180,rowH=70;
+
+  rounds.forEach((round,ri)=>{
+    round.forEach((m,mi)=>{
+
+      let div=document.createElement("div");
+      div.className="match";
+      div.style.left=(ricolW)+"px";
+      div.style.top=(mirowHMath.pow(2,ri))+"px";
+
+      div.appendChild(makePlayer(m,"p1"));
+      div.appendChild(makePlayer(m,"p2"));
+
+      b.appendChild(div);
     });
+  });
 
-    div.classList.remove("lose");
-    div.classList.add("win");
+  b.style.transform="scale("+scale+")";
+
+  checkResult();
+}
+
+/* ===== 玩家 ===== /
+function makePlayer(m,key){
+  let d=document.createElement("div");
+  d.className="player";
+  let name=m[key]||"";
+
+  d.innerText=name;
+
+  if(m.winner){
+    if(name===m.winner)d.classList.add("win");
+    else d.classList.add("lose");
+  }
+
+  d.onclick=()=>{
+    if(!name)return;
+    m.winner=name;
+    history.push(m);
+    propagate();
+    render();
   };
 
-  return div;
+  return d;
 }
+
+/ ===== 晉級 ===== /
+function propagate(){
+  for(let i=0;i<rounds.length-1;i++){
+    let r=rounds[i];
+    let n=rounds[i+1];
+
+    r.forEach((m,mi)=>{
+      if(m.winner){
+        let idx=Math.floor(mi/2);
+        let slot=(mi%2===0?"p1":"p2");
+        if(n[idx])n[idx][slot]=m.winner;
+      }
+    });
+  }
+}
+
+/ ===== 結果 ===== /
+function checkResult(){
+  let last=rounds[rounds.length-1];
+
+  if(last.length===1 && last[0].winner){
+    document.getElementById("result").innerHTML="🏆 冠軍："+last[0].winner;
+  }
+
+  if(last.length===3){
+    let all=last.every(m=>m.winner);
+    if(all){
+      let list=last.map(m=>m.winner);
+      document.getElementById("result").innerHTML=
+      "🥇 "+list[0]+"<br>🥈 "+list[1]+"<br>🥉 "+list[2];
+    }
+  }
+}
+
+/ ===== 撤回 ===== /
+document.getElementById("undo").onclick=()=>{
+  let m=history.pop();
+  if(!m)return;
+  m.winner=null;
+  propagate();
+  render();
+};
+
+/ ===== 縮放 ===== */
+document.getElementById("zoomIn").onclick=()=>{
+  scale+=0.1;render();
+};
+document.getElementById("zoomOut").onclick=()=>{
+  scale-=0.1;if(scale<0.5)scale=0.5;render();
+};
 </script>
 
 </body>
