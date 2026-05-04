@@ -169,7 +169,7 @@ rounds.forEach((round, ri) => {
     let x = ri * colW;
 
     // 🔥 核心：置中排列
-    let y = mi * rowH * gap + (rowH * gap / 2) - (rowH / 2);
+    let y = mi * rowH * gap + (rowH * gap / 2) - (rowH);
 
     let div = document.createElement("div");
     div.className = "match";
@@ -190,8 +190,8 @@ rounds.forEach((round, ri) => {
 let y1 = prevIndex * rowH * gapPrev + (rowH * gapPrev / 2) - (rowH / 2);
 let y2 = y;
      
-let centerOffset = rowH / 2;
 let playerW = document.querySelector(".player")?.offsetWidth || 140;
+let centerOffset = rowH / 2;
 
 drawLine(
   x - colW + playerW,
