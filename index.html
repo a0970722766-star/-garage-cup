@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>車庫大賽 穩定版</title>
+<title>車庫大賽 Pro 最終版</title>
 
 <style>
 body{
@@ -31,8 +31,26 @@ button,select{
   overflow:auto;
   height:90vh;
   border-top:1px solid #333;
-  -webkit-overflow-scrolling: touch;
-  white-space: nowrap;
+  white-space:nowrap;
+}
+
+#stage{
+  position:relative;
+  width:max-content;
+}
+
+#lines{
+  position:absolute;
+  top:0;
+  left:0;
+  z-index:0;
+}
+
+#bracket{
+  position:absolute;
+  top:0;
+  left:0;
+  z-index:1;
 }
 
 .match{
@@ -50,28 +68,6 @@ button,select{
 
 .win{background:#00c853;}
 .lose{background:#444;}
-
-svg{
-  pointer-events:none;
-}
-#stage{
-  position: relative;
-  width: max-content;
-}
-
-#lines{
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 0;
-}
-
-#bracket{
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 1;
-}
 </style>
 </head>
 
@@ -88,8 +84,8 @@ svg{
 
 <br>
 
-<button id="startBtn">開始</button>
-<button id="undoBtn">撤回</button>
+<button onclick="start()">開始</button>
+<button onclick="undo()">撤回</button>
 
 <textarea id="input">玩家1
 玩家2
@@ -111,9 +107,6 @@ svg{
 
 let rounds=[];
 let history=[];
-
-document.getElementById("startBtn").addEventListener("click", start);
-document.getElementById("undoBtn").addEventListener("click", undo);
 
 function start(){
 
@@ -138,7 +131,7 @@ function start(){
     let next=[];
 
     for(let i=0;i<cur.length;i+=2){
-      r.push({p1:cur[i],p2:cur[i+1],winner:null});
+      r.push({p1:cur[i],p2:cur[i+1]||"",winner:null});
       next.push(null);
     }
 
@@ -151,66 +144,90 @@ function start(){
 
 function render(){
 
-  let stage = document.getElementById("stage");
-let bracket = document.getElementById("bracket");
-let svg = document.getElementById("lines");
+  let stage=document.getElementById("stage");
+  let bracket=document.getElementById("bracket");
+  let svg=document.getElementById("lines");
 
   bracket.innerHTML="";
   svg.innerHTML="";
 
-let colW = 260;
-let rowH = 90;
+  let colW=260;
+  let rowH=90;
 
-rounds.forEach((round, ri) => {
-  let gap = Math.pow(2, ri);   // 控制間距倍數
+  rounds.forEach((round,ri)=>{
 
-  round.forEach((m, mi) => {
+    let gap=Math.pow(2,ri);
 
-    let x = ri * colW;
+    round.forEach((m,mi)=>{
 
-    // 🔥 核心：置中排列
-    let y = mi * rowH * gap + (rowH * gap / 2) - (rowH);
+      let x=ri*colW;
+      let y=mi*rowH*gap + (rowH*gap/2 - rowH/2);
 
-    let div = document.createElement("div");
-    div.className = "match";
-    div.style.left = x + "px";
-    div.style.top = y + "px";
+      let div=document.createElement("div");
+      div.className="match";
+      div.style.left=x+"px";
+      div.style.top=y+"px";
 
-    div.appendChild(makePlayer(m, "p1"));
-    div.appendChild(makePlayer(m, "p2"));
+      div.appendChild(makePlayer(m,"p1"));
+      div.appendChild(makePlayer(m,"p2"));
 
-    bracket.appendChild(div);
+      bracket.appendChild(div);
 
-    // 🔥 線條改成抓中點
-   if (ri !== 0) {
-      let prevIndex = Math.floor(mi / 2);
-
-      let gapPrev = Math.pow(2, ri - 1);
-
-let y1 = prevIndex * rowH * gapPrev + (rowH * gapPrev / 2) - (rowH / 2);
-let y2 = y;
-     
-let playerW = document.querySelector(".player")?.offsetWidth || 140;
-let centerOffset = rowH / 2;
-
-drawLine(
-  x - colW + playerW,
-  y1 + centerOffset,
-  x - playerW / 2,
-  y2 + centerOffset
-);
-    }
+    });
 
   });
-});
 
- let width = rounds.length * colW;
-let height = rounds[0].length * rowH * 2;
+  // 畫布尺寸
+  let width=rounds.length*colW;
+  let height=bracket.scrollHeight;
 
-  stage.style.width = width + "px";
-stage.style.height = height + "px";
+  stage.style.width=width+"px";
+  stage.style.height=height+"px";
+
   svg.setAttribute("width",width);
   svg.setAttribute("height",height);
+
+  // ⭐ 關鍵：等 DOM 完成再畫線
+  requestAnimationFrame(drawLines);
+}
+
+function drawLines(){
+
+  let svg=document.getElementById("lines");
+  let bracket=document.getElementById("bracket");
+
+  svg.innerHTML="";
+
+  let matches=document.querySelectorAll(".match");
+
+  matches.forEach(div=>{
+
+    let x=parseInt(div.style.left);
+    let ri=x/260;
+
+    if(ri===0) return;
+
+    let p1=div.children[0];
+    let p2=div.children[1];
+
+    let r1=p1.getBoundingClientRect();
+    let r2=p2.getBoundingClientRect();
+    let container=bracket.getBoundingClientRect();
+
+    let y1=r1.top+r1.height/2-container.top;
+    let y2=r2.top+r2.height/2-container.top;
+
+    let playerW=r1.width;
+
+    drawLine(
+      x-260+playerW,
+      y1,
+      x-playerW/2,
+      y2
+    );
+
+  });
+
 }
 
 function makePlayer(m,key){
@@ -218,7 +235,7 @@ function makePlayer(m,key){
   let d=document.createElement("div");
   d.className="player";
 
-  let name=m[key]||"-";
+  let name=m[key]||"";
   d.innerText=name;
 
   if(m.winner){
@@ -227,7 +244,7 @@ function makePlayer(m,key){
   }
 
   d.onclick=function(){
-    if(name=="-")return;
+    if(!name)return;
 
     m.winner=name;
     history.push(m);
@@ -242,16 +259,18 @@ function makePlayer(m,key){
 function propagate(){
 
   for(let i=0;i<rounds.length-1;i++){
+
     let r=rounds[i];
     let n=rounds[i+1];
 
     r.forEach((m,mi)=>{
       if(m.winner){
         let idx=Math.floor(mi/2);
-        let slot=(mi%2===0?"p1":"p2");
+        let slot=mi%2===0?"p1":"p2";
         n[idx][slot]=m.winner;
       }
     });
+
   }
 }
 
@@ -259,9 +278,8 @@ function drawLine(x1,y1,x2,y2){
 
   let p=document.createElementNS("http://www.w3.org/2000/svg","path");
 
-  p.setAttribute(
-    "d",
-    "M"+x1+" "+y1+" H"+(x2-20)+" V"+y2+" H"+x2
+  p.setAttribute("d",
+    `M${x1} ${y1} H${x2-20} V${y2} H${x2}`
   );
 
   p.setAttribute("stroke","#fff");
