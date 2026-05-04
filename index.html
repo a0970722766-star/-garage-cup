@@ -142,36 +142,41 @@ function render(){
   bracket.innerHTML="";
   svg.innerHTML="";
 
-  let colW=220;
-  let rowH=70;
+let colW = 220;
+let rowH = 90;
 
-  rounds.forEach((round,ri)=>{
-    round.forEach((m,mi)=>{
+rounds.forEach((round, ri) => {
+  let gap = Math.pow(2, ri);   // 控制間距倍數
 
-      let x=ri*colW;
-      let y=mi*rowH*Math.pow(2,ri);
+  round.forEach((m, mi) => {
 
-      let div=document.createElement("div");
-      div.className="match";
-      div.style.left=x+"px";
-      div.style.top=y+"px";
+    let x = ri * colW;
 
-      div.appendChild(makePlayer(m,"p1"));
-      div.appendChild(makePlayer(m,"p2"));
+    // 🔥 核心：置中排列
+    let y = mi * rowH * gap + (rowH * gap / 2);
 
-      bracket.appendChild(div);
+    let div = document.createElement("div");
+    div.className = "match";
+    div.style.left = x + "px";
+    div.style.top = y + "px";
 
-      if(ri>0){
-        let prev=Math.floor(mi/2);
+    div.appendChild(makePlayer(m, "p1"));
+    div.appendChild(makePlayer(m, "p2"));
 
-        let y1=prev*rowH*Math.pow(2,ri-1)+20;
-        let y2=y+20;
+    bracket.appendChild(div);
 
-        drawLine(x-60,y1,x,y2);
-      }
+    // 🔥 線條改成抓中點
+    if (ri > 0) {
+      let prevIndex = Math.floor(mi / 2);
 
-    });
+      let y1 = prevIndex * rowH * Math.pow(2, ri - 1) + (rowH * Math.pow(2, ri - 1) / 2);
+      let y2 = y;
+
+      drawLine(x - 60, y1 + 16, x, y2 + 16);
+    }
+
   });
+});
 
   let width=rounds.length*colW;
   let height=2000;
