@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>車庫大賽 修正版</title>
+<title>車庫大賽 穩定版</title>
 
 <style>
 body{
@@ -30,7 +30,7 @@ button,select{
 #view{
   overflow:auto;
   height:70vh;
-  position:relative;
+  border-top:1px solid #333;
 }
 
 #bracket{
@@ -43,9 +43,8 @@ button,select{
 
 .player{
   width:140px;
-  height:32px;
-  line-height:32px;
-  margin:2px 0;
+  padding:8px;
+  margin:4px 0;
   border-radius:8px;
   background:#2ecc71;
   cursor:pointer;
@@ -58,6 +57,7 @@ svg{
   position:absolute;
   top:0;
   left:0;
+  pointer-events:none;
 }
 </style>
 </head>
@@ -75,8 +75,8 @@ svg{
 
 <br>
 
-<button onclick="start()">開始</button>
-<button onclick="undo()">撤回</button>
+<button id="startBtn">開始</button>
+<button id="undoBtn">撤回</button>
 
 <textarea id="input">玩家1
 玩家2
@@ -88,14 +88,17 @@ svg{
 玩家8</textarea>
 
 <div id="view">
-  <svg id="lines"></svg>
   <div id="bracket"></div>
+  <svg id="lines"></svg>
 </div>
 
 <script>
 
 let rounds=[];
 let history=[];
+
+document.getElementById("startBtn").addEventListener("click", start);
+document.getElementById("undoBtn").addEventListener("click", undo);
 
 function start(){
 
@@ -139,79 +142,53 @@ function render(){
   bracket.innerHTML="";
   svg.innerHTML="";
 
-  let colW=200;
-  let baseY=80;
-
-  let pos=[];
+  let colW=220;
+  let rowH=70;
 
   rounds.forEach((round,ri)=>{
-
-    pos[ri]=[];
-
     round.forEach((m,mi)=>{
 
-      let x = ri * colW;
-      let y;
-
-      // 第一輪（兩個一組）
-      if(ri===0){
-        let group=Math.floor(mi/2);
-        let offset=mi%2;
-        y = group * (baseY2.5) + offset * 40;
-      }
-      else{
-        let y1 = pos[ri-1][mi2];
-        let y2 = pos[ri-1][mi2+1];
-        y = (y1 + y2) / 2;
-      }
-
-      pos[ri][mi]=y;
+      let x=ri*colW;
+      let y=mi*rowH*Math.pow(2,ri);
 
       let div=document.createElement("div");
       div.className="match";
       div.style.left=x+"px";
       div.style.top=y+"px";
 
-      div.appendChild(player(m,"p1"));
-      div.appendChild(player(m,"p2"));
+      div.appendChild(makePlayer(m,"p1"));
+      div.appendChild(makePlayer(m,"p2"));
 
       bracket.appendChild(div);
 
-      // 畫線（兩條）
       if(ri>0){
-        let y1=pos[ri-1][mi2];
-        let y2=pos[ri-1][mi2+1];
+        let prev=Math.floor(mi/2);
 
-        drawLine(x-50,y1+16,x,y+16);
-        drawLine(x-50,y2+16,x,y+16);
+        let y1=prev*rowH*Math.pow(2,ri-1)+20;
+        let y2=y+20;
+
+        drawLine(x-60,y1,x,y2);
       }
 
     });
-
   });
 
-let width = rounds.length * 220;
-let height = 2000;
+  let width=rounds.length*colW;
+  let height=2000;
 
-bracket.style.width = width + "px";
-bracket.style.height = height + "px";
+  bracket.style.width=width+"px";
+  bracket.style.height=height+"px";
 
-svg.setAttribute("width", width);
-svg.setAttribute("height", height);
+  svg.setAttribute("width",width);
+  svg.setAttribute("height",height);
 }
 
-function player(m,key){
+function makePlayer(m,key){
 
   let d=document.createElement("div");
   d.className="player";
 
-  let name=m[key];
-
-  if(!name){
-    d.style.background="#222";
-    return d;
-  }
-
+  let name=m[key]||"-";
   d.innerText=name;
 
   if(m.winner){
@@ -219,9 +196,12 @@ function player(m,key){
     else d.classList.add("lose");
   }
 
-  d.onclick=()=>{
+  d.onclick=function(){
+    if(name=="-")return;
+
     m.winner=name;
     history.push(m);
+
     propagate();
     render();
   };
@@ -264,6 +244,7 @@ function drawLine(x1,y1,x2,y2){
 function undo(){
   let m=history.pop();
   if(!m)return;
+
   m.winner=null;
   propagate();
   render();
