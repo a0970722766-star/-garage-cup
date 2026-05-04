@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>車庫大賽 完整穩定版</title>
+<title>車庫大賽 修正版</title>
 
 <style>
 body{
@@ -12,8 +12,6 @@ body{
   text-align:center;
   font-family:sans-serif;
 }
-
-h1{margin:20px 0;}
 
 textarea{
   width:90%;
@@ -32,11 +30,11 @@ button,select{
 #view{
   overflow:auto;
   height:70vh;
+  position:relative;
 }
 
 #bracket{
   position:relative;
-  min-height:1500px;
 }
 
 .match{
@@ -45,12 +43,12 @@ button,select{
 
 .player{
   width:140px;
-  padding:8px;
-  margin:3px 0;
+  height:32px;
+  line-height:32px;
+  margin:2px 0;
   border-radius:8px;
   background:#2ecc71;
   cursor:pointer;
-  text-align:center;
 }
 
 .win{background:#00c853;}
@@ -60,7 +58,6 @@ svg{
   position:absolute;
   top:0;
   left:0;
-  pointer-events:none;
 }
 </style>
 </head>
@@ -91,8 +88,8 @@ svg{
 玩家8</textarea>
 
 <div id="view">
-  <div id="bracket"></div>
   <svg id="lines"></svg>
+  <div id="bracket"></div>
 </div>
 
 <script>
@@ -137,13 +134,13 @@ function start(){
 function render(){
 
   let bracket=document.getElementById("bracket");
-  let lines=document.getElementById("lines");
+  let svg=document.getElementById("lines");
 
   bracket.innerHTML="";
-  lines.innerHTML="";
+  svg.innerHTML="";
 
-  let colW=180;
-  let baseY=50;
+  let colW=200;
+  let baseY=80;
 
   let pos=[];
 
@@ -156,20 +153,19 @@ function render(){
       let x = ri * colW;
       let y;
 
-      // 第一輪：兩個靠一起 + 場與場有間距
+      // 第一輪（兩個一組）
       if(ri===0){
-        let matchIndex = Math.floor(mi/2);
-        let offset = mi % 2;
-        y = matchIndex * (baseY * 3) + offset * baseY;
+        let group=Math.floor(mi/2);
+        let offset=mi%2;
+        y = group * (baseY2.5) + offset * 40;
       }
-      // 後面輪數：取中間
       else{
         let y1 = pos[ri-1][mi2];
         let y2 = pos[ri-1][mi2+1];
         y = (y1 + y2) / 2;
       }
 
-      pos[ri][mi] = y;
+      pos[ri][mi]=y;
 
       let div=document.createElement("div");
       div.className="match";
@@ -183,18 +179,25 @@ function render(){
 
       // 畫線（兩條）
       if(ri>0){
-        let y1 = pos[ri-1][mi2];
-        let y2 = pos[ri-1][mi2+1];
+        let y1=pos[ri-1][mi2];
+        let y2=pos[ri-1][mi2+1];
 
-        drawLine(x-40, y1+15, x, y+15);
-        drawLine(x-40, y2+15, x, y+15);
+        drawLine(x-50,y1+16,x,y+16);
+        drawLine(x-50,y2+16,x,y+16);
       }
 
     });
 
   });
 
-  bracket.style.width = (rounds.length * 200) + "px";
+let width = rounds.length * 220;
+let height = 2000;
+
+bracket.style.width = width + "px";
+bracket.style.height = height + "px";
+
+svg.setAttribute("width", width);
+svg.setAttribute("height", height);
 }
 
 function player(m,key){
@@ -205,7 +208,6 @@ function player(m,key){
   let name=m[key];
 
   if(!name){
-    d.innerText="";
     d.style.background="#222";
     return d;
   }
@@ -230,7 +232,6 @@ function player(m,key){
 function propagate(){
 
   for(let i=0;i<rounds.length-1;i++){
-
     let r=rounds[i];
     let n=rounds[i+1];
 
@@ -241,23 +242,23 @@ function propagate(){
         n[idx][slot]=m.winner;
       }
     });
-
   }
 }
 
 function drawLine(x1,y1,x2,y2){
 
-  let path=document.createElementNS("http://www.w3.org/2000/svg","path");
+  let p=document.createElementNS("http://www.w3.org/2000/svg","path");
 
-  path.setAttribute(
+  p.setAttribute(
     "d",
     "M"+x1+" "+y1+" H"+(x2-20)+" V"+y2+" H"+x2
   );
 
-  path.setAttribute("stroke","#fff");
-  path.setAttribute("fill","none");
+  p.setAttribute("stroke","#fff");
+  p.setAttribute("stroke-width","2");
+  p.setAttribute("fill","none");
 
-  document.getElementById("lines").appendChild(path);
+  document.getElementById("lines").appendChild(p);
 }
 
 function undo(){
