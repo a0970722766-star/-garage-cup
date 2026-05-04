@@ -225,7 +225,7 @@ function drawLine(x1,y1,x2,y2){
 
   let p=document.createElementNS("http://www.w3.org/2000/svg","path");
 
-  p.setAttribute("d", M${x1} ${y1} H${x2-30} V${y2} H${x2});
+  p.setAttribute("d", "M"+x1+" "+y1+" H"+(x2-30)+" V"+y2+" H"+x2);
   p.setAttribute("stroke","#fff");
   p.setAttribute("fill","none");
 
