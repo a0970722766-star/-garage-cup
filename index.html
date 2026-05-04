@@ -1,64 +1,3 @@
-<!DOCTYPE html>
-<html lang="zh">
-<head>
-<meta charset="UTF-8">
-<title>車庫大賽 Pro 穩定版</title>
-
-<style>
-body{margin:0;background:#000;color:#fff;text-align:center;font-family:sans-serif;}
-textarea{width:90%;height:120px;margin:10px;border-radius:10px;}
-button,select{padding:8px;margin:5px;border-radius:8px;border:none;}
-
-#view{overflow:auto;height:70vh;}
-#bracket{position:relative;}
-.match{position:absolute;}
-
-.player{
-  width:140px;
-  padding:8px;
-  margin:4px 0;
-  border-radius:8px;
-  background:#2ecc71;
-  cursor:pointer;
-}
-.win{background:#00c853;}
-.lose{background:#444;}
-
-svg{position:absolute;top:0;left:0;pointer-events:none;}
-</style>
-</head>
-
-<body>
-
-<h1>🏆 車庫大賽</h1>
-
-<select id="mode">
-<option value="8">8人</option>
-<option value="16">16人</option>
-<option value="32">32人</option>
-<option value="48">48人</option>
-<option value="64">64人</option>
-</select>
-
-<br>
-
-<button id="startBtn">開始</button>
-<button id="undoBtn">撤回</button>
-
-<textarea id="input">玩家1
-玩家2
-玩家3
-玩家4
-玩家5
-玩家6
-玩家7
-玩家8</textarea>
-
-<div id="view">
-  <div id="bracket"></div>
-  <svg id="lines"></svg>
-</div>
-
 <script>
 document.getElementById("startBtn").addEventListener("click", start);
 
@@ -112,8 +51,8 @@ function render(){
   rounds.forEach((round,ri)=>{
     round.forEach((m,mi)=>{
 
-      let x=ricolW;
-      let y=mirowHMath.pow(2,ri);
+      let x = ri * colW;
+      let y = mi * rowH * Math.pow(2, ri);
 
       let div=document.createElement("div");
       div.className="match";
@@ -130,7 +69,7 @@ function render(){
 
         drawLine(
           x-60,
-          prevrowHMath.pow(2,ri-1)+20,
+          prev * rowH * Math.pow(2, ri-1) + 20,
           x,
           y+20
         );
@@ -138,71 +77,7 @@ function render(){
     });
   });
 
-  bracket.style.width=(rounds.length220)+"px";
+  bracket.style.width=(rounds.length * 220)+"px";
   bracket.style.height="2000px";
 }
-
-function player(m,key){
-
-  let d=document.createElement("div");
-  d.className="player";
-
-  let name=m[key]||"-";
-  d.innerText=name;
-
-  if(m.winner){
-    if(name===m.winner)d.classList.add("win");
-    else d.classList.add("lose");
-  }
-
-  d.onclick=()=>{
-    if(name=="-")return;
-
-    m.winner=name;
-    history.push(m);
-
-    propagate();
-    render();
-  };
-
-  return d;
-}
-
-function propagate(){
-
-  for(let i=0;i<rounds.length-1;i++){
-    let r=rounds[i];
-    let n=rounds[i+1];
-
-    r.forEach((m,mi)=>{
-      if(m.winner){
-        let idx=Math.floor(mi/2);
-        let slot=(mi%2===0?"p1":"p2");
-        n[idx][slot]=m.winner;
-      }
-    });
-  }
-}
-
-function drawLine(x1,y1,x2,y2){
-
-  let p=document.createElementNS("http://www.w3.org/2000/svg","path");
-
-  p.setAttribute("d",M${x1} ${y1} H${x2-30} V${y2} H${x2});
-  p.setAttribute("stroke","#fff");
-  p.setAttribute("fill","none");
-
-  document.getElementById("lines").appendChild(p);
-}
-
-document.getElementById("undoBtn").onclick=()=>{
-  let m=history.pop();
-  if(!m)return;
-  m.winner=null;
-  propagate();
-  render();
-};
 </script>
-
-</body>
-</html>
