@@ -182,15 +182,23 @@ rounds.forEach((round, ri) => {
     bracket.appendChild(div);
 
     // 🔥 線條改成抓中點
-    if (ri > 0) {
+   if (ri !== 0) {
       let prevIndex = Math.floor(mi / 2);
 
       let gapPrev = Math.pow(2, ri - 1);
 
 let y1 = prevIndex * rowH * gapPrev + (rowH * gapPrev / 2) - (rowH / 2);
 let y2 = y;
+     
+let centerOffset = rowH / 2;
+let playerW = document.querySelector(".player")?.offsetWidth || 140;
 
-      drawLine(x - 60, y1 + 20, x, y2 + 20);
+drawLine(
+  x - colW + playerW,
+  y1 + centerOffset,
+  x - playerW / 2,
+  y2 + centerOffset
+);
     }
 
   });
