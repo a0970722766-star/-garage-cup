@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>車庫大賽 穩定版</title>
+<title>車庫大賽 Ultimate 穩定版</title>
 
 <style>
 body{
@@ -34,6 +34,7 @@ button,select{
 
 #bracket{
   position:relative;
+  min-height:1500px;
 }
 
 .match{
@@ -56,7 +57,6 @@ svg{
   position:absolute;
   top:0;
   left:0;
-  pointer-events:none;
 }
 </style>
 </head>
@@ -98,8 +98,10 @@ let history=[];
 
 function start(){
 
-  let input=document.getElementById("input").value;
-  let names=input.split("\n").map(x=>x.trim()).filter(x=>x);
+  let names=document.getElementById("input").value
+    .split("\n")
+    .map(x=>x.trim())
+    .filter(x=>x);
 
   let size=parseInt(document.getElementById("mode").value);
 
@@ -117,11 +119,7 @@ function start(){
     let next=[];
 
     for(let i=0;i<cur.length;i+=2){
-      r.push({
-        p1:cur[i],
-        p2:cur[i+1],
-        winner:null
-      });
+      r.push({p1:cur[i],p2:cur[i+1],winner:null});
       next.push(null);
     }
 
@@ -134,13 +132,13 @@ function start(){
 
 function render(){
 
-  const bracket=document.getElementById("bracket");
-  const lines=document.getElementById("lines");
+  let bracket=document.getElementById("bracket");
+  let lines=document.getElementById("lines");
 
   bracket.innerHTML="";
   lines.innerHTML="";
 
-  let colW=200;
+  let colW=180;
   let rowH=70;
 
   rounds.forEach((round,ri)=>{
@@ -154,8 +152,8 @@ function render(){
       div.style.left=x+"px";
       div.style.top=y+"px";
 
-      div.appendChild(makePlayer(m,"p1"));
-      div.appendChild(makePlayer(m,"p2"));
+      div.appendChild(createPlayer(m,"p1"));
+      div.appendChild(createPlayer(m,"p2"));
 
       bracket.appendChild(div);
 
@@ -163,39 +161,41 @@ function render(){
         let prev=Math.floor(mi/2);
 
         drawLine(
-          x-60,
-          prev * rowH * Math.pow(2, ri-1) + 20,
+          x-40,
+          prev * rowH * Math.pow(2, ri-1)+20,
           x,
-          y + 20
+          y+20
         );
       }
 
     });
   });
 
-  bracket.style.width = (rounds.length * 220) + "px";
-  bracket.style.height = "2000px";
+  bracket.style.width=(rounds.length*200)+"px";
 }
 
-function makePlayer(m,key){
+function createPlayer(m,key){
 
   let d=document.createElement("div");
   d.className="player";
 
-  let name=m[key] || "-";
+  let name=m[key];
+  if(!name){
+    d.innerText="";
+    d.style.background="#222";
+    return d;
+  }
+
   d.innerText=name;
 
   if(m.winner){
-    if(name===m.winner) d.classList.add("win");
+    if(name===m.winner)d.classList.add("win");
     else d.classList.add("lose");
   }
 
   d.onclick=()=>{
-    if(name=="-") return;
-
     m.winner=name;
     history.push(m);
-
     propagate();
     render();
   };
@@ -223,19 +223,18 @@ function propagate(){
 
 function drawLine(x1,y1,x2,y2){
 
-  let p=document.createElementNS("http://www.w3.org/2000/svg","path");
+  let path=document.createElementNS("http://www.w3.org/2000/svg","path");
 
-  p.setAttribute("d", "M"+x1+" "+y1+" H"+(x2-30)+" V"+y2+" H"+x2);
-  p.setAttribute("stroke","#fff");
-  p.setAttribute("fill","none");
+  path.setAttribute("d","M"+x1+" "+y1+" H"+(x2-20)+" V"+y2+" H"+x2);
+  path.setAttribute("stroke","#fff");
+  path.setAttribute("fill","none");
 
-  document.getElementById("lines").appendChild(p);
+  document.getElementById("lines").appendChild(path);
 }
 
 function undo(){
   let m=history.pop();
-  if(!m) return;
-
+  if(!m)return;
   m.winner=null;
   propagate();
   render();
