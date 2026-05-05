@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>車庫大賽 Pro 最終版</title>
+<title>車庫大賽 完整穩定版</title>
 
 <style>
 body{
@@ -55,6 +55,7 @@ button,select{
 
 .match{
   position:absolute;
+  width:160px; /* ⭐ 防止後面縮水 */
 }
 
 .player{
@@ -68,6 +69,10 @@ button,select{
 
 .win{background:#00c853;}
 .lose{background:#444;}
+
+svg{
+  pointer-events:none;
+}
 </style>
 </head>
 
@@ -177,7 +182,7 @@ function render(){
 
   });
 
-  // 畫布尺寸
+  // 尺寸
   let width=rounds.length*colW;
   let height=bracket.scrollHeight;
 
@@ -187,7 +192,7 @@ function render(){
   svg.setAttribute("width",width);
   svg.setAttribute("height",height);
 
-  // ⭐ 關鍵：等 DOM 完成再畫線
+  // ⭐ 等畫面完成再畫線
   requestAnimationFrame(drawLines);
 }
 
@@ -199,32 +204,32 @@ function drawLines(){
   svg.innerHTML="";
 
   let matches=document.querySelectorAll(".match");
+  let colW=260;
 
-  matches.forEach(div=>{
+  matches.forEach((div,index)=>{
 
     let x=parseInt(div.style.left);
-    let ri=x/260;
+    let ri=x/colW;
 
     if(ri===0) return;
 
-    let p1=div.children[0];
-    let p2=div.children[1];
+    // 👉 上一輪的 match
+    let prevIndex=Math.floor(index/2);
+    let prevMatch=matches[prevIndex];
 
-    let r1=p1.getBoundingClientRect();
-    let r2=p2.getBoundingClientRect();
+    if(!prevMatch) return;
+
+    let r1=prevMatch.getBoundingClientRect();
+    let r2=div.getBoundingClientRect();
     let container=bracket.getBoundingClientRect();
 
     let y1=r1.top+r1.height/2-container.top;
     let y2=r2.top+r2.height/2-container.top;
 
-    let playerW=r1.width;
+    let startX=parseInt(prevMatch.style.left)+140;
+    let endX=x;
 
-    drawLine(
-      x-260+playerW,
-      y1,
-      x-playerW/2,
-      y2
-    );
+    drawLine(startX,y1,endX,y2);
 
   });
 
