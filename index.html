@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>車庫大賽（無線金字塔版）</title>
+<title>車庫大賽 穩定最終版</title>
 
 <style>
 body{
@@ -32,6 +32,7 @@ button,select{
   height:80vh;
 }
 
+/* 整體 */
 #bracket{
   display:flex;
   align-items:flex-start;
@@ -40,8 +41,9 @@ button,select{
 
 /* 每一輪 */
 .round{
-  display:grid;
-  margin:0 30px;
+  display:flex;
+  flex-direction:column;
+  margin:0 40px;
 }
 
 /* 每一場 */
@@ -49,12 +51,14 @@ button,select{
   display:flex;
   flex-direction:column;
   align-items:center;
+  margin-bottom:40px; /* 🔥 關鍵：間距 */
 }
 
 /* 玩家 */
 .player{
   width:140px;
-  padding:8px;
+  height:36px;        /* 🔥 固定高度 */
+  line-height:36px;
   margin:4px 0;
   border-radius:8px;
   background:#2ecc71;
@@ -64,10 +68,11 @@ button,select{
 .win{background:#00c853;}
 .lose{background:#444;}
 
-/* 排名區 */
+/* 結果 */
 #result{
-  margin-left:40px;
-  text-align:left;
+  margin-left:50px;
+  font-size:18px;
+  line-height:2;
 }
 </style>
 </head>
@@ -80,7 +85,6 @@ button,select{
 <option value="8">8人</option>
 <option value="16">16人</option>
 <option value="32">32人</option>
-<option value="48">48人（循環賽）</option>
 <option value="64">64人</option>
 </select>
 
@@ -116,12 +120,6 @@ function start(){
 
   let size=parseInt(document.getElementById("mode").value);
 
-  // ⭐ 48人 → 走循環賽
-  if(size===48){
-    renderRoundRobin(names);
-    return;
-  }
-
   while(names.length<size){
     names.push("玩家"+(names.length+1));
   }
@@ -144,10 +142,10 @@ function start(){
     cur=next;
   }
 
-  renderBracket();
+  render();
 }
 
-function renderBracket(){
+function render(){
 
   let container=document.getElementById("bracket");
   container.innerHTML="";
@@ -159,15 +157,13 @@ function renderBracket(){
 
     let gap=Math.pow(2,ri);
 
-    col.style.gridTemplateRows = `repeat(${round.length*gap}, 40px)`;
-
     round.forEach((m,mi)=>{
-
-      let rowIndex = mi*gap + Math.floor(gap/2);
 
       let div=document.createElement("div");
       div.className="match";
-      div.style.gridRow = rowIndex;
+
+      /* 🔥 核心：用 margin 做「金字塔置中」 */
+      div.style.marginTop = (gap===1?0:(gap-1)*40) + "px";
 
       div.appendChild(makePlayer(m,"p1"));
       div.appendChild(makePlayer(m,"p2"));
@@ -202,7 +198,7 @@ function makePlayer(m,key){
     history.push(m);
 
     propagate();
-    renderBracket();
+    render();
   };
 
   return d;
@@ -232,62 +228,35 @@ function undo(){
 
   m.winner=null;
   propagate();
-  renderBracket();
+  render();
 }
 
-/* 🏆 冠亞季 */
+/* 🏆 結果（放大版） */
 function renderResult(){
 
   let old=document.getElementById("result");
   if(old) old.remove();
 
-  if(rounds.length===0) return;
+  let final=rounds[rounds.length-1][0];
+  if(!final.winner)return;
 
-  let finalRound=rounds[rounds.length-1][0];
+  let div=document.createElement("div");
+  div.id="result";
 
-  if(!finalRound.winner) return;
+  let champion=final.winner;
+  let runner=final.p1===champion?final.p2:final.p1;
 
-  let result=document.createElement("div");
-  result.id="result";
-
-  let champion=finalRound.winner;
-  let runner=finalRound.p1===champion?finalRound.p2:finalRound.p1;
-
-  // 季軍 = 前一輪輸家
   let semi=rounds[rounds.length-2];
-  let losers=semi.map(m=>{
-    return m.p1===m.winner?m.p2:m.p1;
-  });
+  let losers=semi.map(m=>m.p1===m.winner?m.p2:m.p1);
 
-  result.innerHTML=`
-  <h2>🏆 結果</h2>
-  冠軍：${champion}<br>
-  亞軍：${runner}<br>
-  季軍：${losers.join(" / ")}
+  div.innerHTML=`
+  <h2>🏆 比賽結果</h2>
+  🥇 冠軍：${champion}<br>
+  🥈 亞軍：${runner}<br>
+  🥉 季軍：${losers.join(" / ")}
   `;
 
-  document.getElementById("bracket").appendChild(result);
-}
-
-/* 🔁 48人循環賽（簡單版） */
-function renderRoundRobin(names){
-
-  let container=document.getElementById("bracket");
-  container.innerHTML="<h2>🔁 循環賽</h2>";
-
-  let table=document.createElement("div");
-
-  names.forEach(a=>{
-    names.forEach(b=>{
-      if(a!==b){
-        let div=document.createElement("div");
-        div.innerText=`${a} vs ${b}`;
-        table.appendChild(div);
-      }
-    });
-  });
-
-  container.appendChild(table);
+  document.getElementById("bracket").appendChild(div);
 }
 
 </script>
