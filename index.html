@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>車庫大賽 完整版</title>
+<title>車庫大賽 最終版</title>
 
 <style>
 body{
@@ -11,6 +11,17 @@ body{
   color:#fff;
   text-align:center;
   font-family:sans-serif;
+}
+
+h1{margin-top:20px;}
+
+#result{
+  position:absolute;
+  right:20px;
+  top:20px;
+  text-align:left;
+  font-size:16px;
+  line-height:1.8;
 }
 
 textarea{
@@ -27,52 +38,26 @@ button,select{
   border:none;
 }
 
-/* 🔥 可縮放區 */
-#stageWrapper{
+#view{
+  overflow:auto;
   height:80vh;
-  overflow:hidden;
-  touch-action:none;
-}
-
-#stage{
-  transform-origin: top left;
-}
-
-/* 右上結果 */
-#resultBox{
-  position:absolute;
-  right:20px;
-  top:80px;
-  text-align:left;
-  font-size:18px;
-  line-height:1.8;
-}
-
-/* 排列 */
-#bracket{
-  display:flex;
-  align-items:flex-start;
-  padding:20px;
+  white-space:nowrap;
 }
 
 .round{
-  display:flex;
-  flex-direction:column;
+  display:inline-block;
+  position:relative;
   margin:0 40px;
 }
 
 .match{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  margin-bottom:40px;
+  position:absolute;
 }
 
 .player{
   width:140px;
-  height:36px;
-  line-height:36px;
-  margin:4px 0;
+  padding:8px;
+  margin:6px 0;
   border-radius:8px;
   background:#2ecc71;
   cursor:pointer;
@@ -80,6 +65,11 @@ button,select{
 
 .win{background:#00c853;}
 .lose{background:#444;}
+
+.label{
+  font-size:12px;
+  opacity:0.6;
+}
 </style>
 </head>
 
@@ -87,7 +77,7 @@ button,select{
 
 <h1>🏆 車庫大賽</h1>
 
-<div id="resultBox"></div>
+<div id="result"></div>
 
 <select id="mode">
 <option value="8">8人</option>
@@ -110,19 +100,16 @@ button,select{
 玩家7
 玩家8</textarea>
 
-<div id="stageWrapper">
-  <div id="stage">
-    <div id="bracket"></div>
-  </div>
+<div id="view">
+  <div id="bracket"></div>
 </div>
 
 <script>
 
 let rounds=[];
 let history=[];
-let thirdMatch={p1:null,p2:null,winner:null};
+let thirdMatch=null;
 
-/* ===== 開始 ===== */
 function start(){
 
   let names=document.getElementById("input").value
@@ -138,7 +125,6 @@ function start(){
 
   rounds=[];
   history=[];
-  thirdMatch={p1:null,p2:null,winner:null};
 
   let cur=[...names];
 
@@ -155,35 +141,53 @@ function start(){
     cur=next;
   }
 
-  /* 初始縮放 */
-  scale = size >= 32 ? 0.7 : 1;
-  posX = 0;
-  posY = 0;
-  updateTransform();
+  // 季軍賽
+  thirdMatch = {p1:null,p2:null,winner:null};
 
   render();
 }
 
-/* ===== 畫面 ===== */
 function render(){
 
   let container=document.getElementById("bracket");
   container.innerHTML="";
 
+  let rowH = 80;
+  let colW = 180;
+
+  let positions=[];
+
   rounds.forEach((round,ri)=>{
+
+    positions[ri]=[];
 
     let col=document.createElement("div");
     col.className="round";
-
-    let gap=Math.pow(2,ri);
 
     round.forEach((m,mi)=>{
 
       let div=document.createElement("div");
       div.className="match";
 
-      div.style.marginTop=(gap===1?0:(gap-1)*40)+"px";
+      let y;
 
+      if(ri===0){
+        y = mi * rowH * 2;
+      }else{
+        let y1 = positions[ri-1][mi*2];
+        let y2 = positions[ri-1][mi*2+1];
+        y = (y1 + y2) / 2;
+      }
+
+      positions[ri][mi]=y;
+      div.style.top=y+"px";
+
+      // 場次（每輪重新）
+      let label=document.createElement("div");
+      label.className="label";
+      label.innerText="第"+(mi+1)+"場";
+
+      div.appendChild(label);
       div.appendChild(makePlayer(m,"p1"));
       div.appendChild(makePlayer(m,"p2"));
 
@@ -197,13 +201,12 @@ function render(){
   renderResult();
 }
 
-/* ===== 玩家 ===== */
 function makePlayer(m,key){
 
   let d=document.createElement("div");
   d.className="player";
 
-  let name=m[key]||"";
+  let name=m[key]||"-";
   d.innerText=name;
 
   if(m.winner){
@@ -212,7 +215,7 @@ function makePlayer(m,key){
   }
 
   d.onclick=function(){
-    if(!name)return;
+    if(name=="-")return;
 
     m.winner=name;
     history.push(m);
@@ -224,111 +227,64 @@ function makePlayer(m,key){
   return d;
 }
 
-/* ===== 推進 ===== */
 function propagate(){
 
   for(let i=0;i<rounds.length-1;i++){
-
     let r=rounds[i];
     let n=rounds[i+1];
 
     r.forEach((m,mi)=>{
       if(m.winner){
         let idx=Math.floor(mi/2);
-        let slot=mi%2===0?"p1":"p2";
+        let slot=(mi%2===0?"p1":"p2");
         n[idx][slot]=m.winner;
       }
     });
   }
 
-  /* 季軍賽 */
+  // 半決賽輸家進季軍賽
   if(rounds.length>=2){
     let semi=rounds[rounds.length-2];
-
-    let losers=semi.map(m=>{
-      if(!m.winner)return null;
-      return m.p1===m.winner?m.p2:m.p1;
-    }).filter(x=>x);
-
-    if(losers.length===2){
-      thirdMatch.p1=losers[0];
-      thirdMatch.p2=losers[1];
+    if(semi.length===2){
+      thirdMatch.p1 = semi[0].p1===semi[0].winner?semi[0].p2:semi[0].p1;
+      thirdMatch.p2 = semi[1].p1===semi[1].winner?semi[1].p2:semi[1].p1;
     }
   }
 }
 
-/* ===== 季軍賽 ===== */
 function renderThird(){
 
-  if(!thirdMatch.p1)return;
+  if(!thirdMatch) return;
 
-  let container=document.getElementById("bracket");
-
-  let col=document.createElement("div");
-  col.className="round";
+  let box=document.createElement("div");
+  box.style.marginTop="40px";
 
   let title=document.createElement("div");
-  title.innerHTML="🥉 季軍賽";
-  title.style.marginBottom="10px";
+  title.innerText="🥉 季軍賽";
 
-  col.appendChild(title);
+  box.appendChild(title);
+  box.appendChild(makePlayer(thirdMatch,"p1"));
+  box.appendChild(makePlayer(thirdMatch,"p2"));
 
-  let div=document.createElement("div");
-  div.className="match";
-
-  div.appendChild(makeThirdPlayer("p1"));
-  div.appendChild(makeThirdPlayer("p2"));
-
-  col.appendChild(div);
-  container.appendChild(col);
+  document.getElementById("bracket").appendChild(box);
 }
 
-function makeThirdPlayer(key){
-
-  let d=document.createElement("div");
-  d.className="player";
-
-  let name=thirdMatch[key];
-  d.innerText=name||"";
-
-  if(thirdMatch.winner){
-    if(name===thirdMatch.winner)d.classList.add("win");
-    else d.classList.add("lose");
-  }
-
-  d.onclick=function(){
-    if(!name)return;
-
-    thirdMatch.winner=name;
-    render();
-  };
-
-  return d;
-}
-
-/* ===== 結果 ===== */
 function renderResult(){
 
-  let box=document.getElementById("resultBox");
+  let final = rounds[rounds.length-1][0];
 
-  let final=rounds[rounds.length-1][0];
-  if(!final.winner){
-    box.innerHTML="";
-    return;
-  }
+  let champ = final.winner || "?";
+  let runner = final.p1===champ ? final.p2 : final.p1;
 
-  let champion=final.winner;
-  let runner=final.p1===champion?final.p2:final.p1;
-  let third=thirdMatch.winner||"?";
+  let third = thirdMatch?.winner || "?";
 
-  box.innerHTML=`
-  🥇 冠軍：${champion}<br>
-  🥈 亞軍：${runner}<br>
-  🥉 季軍：${third}
+  document.getElementById("result").innerHTML = `
+  🥇冠軍：${champ}<br>
+  🥈亞軍：${runner || "?"}<br>
+  🥉季軍：${third}
   `;
 }
 
-/* ===== 撤回 ===== */
 function undo(){
   let m=history.pop();
   if(!m)return;
@@ -336,58 +292,6 @@ function undo(){
   m.winner=null;
   propagate();
   render();
-}
-
-/* ===== 手機縮放拖曳 ===== */
-let scale = 1;
-let posX = 0;
-let posY = 0;
-
-const stage = document.getElementById("stage");
-const wrapper = document.getElementById("stageWrapper");
-
-let isDragging = false;
-let startX, startY;
-
-wrapper.addEventListener("touchstart", e=>{
-  if(e.touches.length===1){
-    isDragging=true;
-    startX=e.touches[0].clientX-posX;
-    startY=e.touches[0].clientY-posY;
-  }
-});
-
-wrapper.addEventListener("touchmove", e=>{
-
-  if(e.touches.length===1 && isDragging){
-    posX=e.touches[0].clientX-startX;
-    posY=e.touches[0].clientY-startY;
-    updateTransform();
-  }
-
-  if(e.touches.length===2){
-    let dx=e.touches[0].clientX-e.touches[1].clientX;
-    let dy=e.touches[0].clientY-e.touches[1].clientY;
-    let dist=Math.sqrt(dx*dx+dy*dy);
-
-    if(window.lastDist){
-      scale += (dist-window.lastDist)*0.005;
-      scale=Math.max(0.5,Math.min(1.5,scale));
-      updateTransform();
-    }
-
-    window.lastDist=dist;
-  }
-});
-
-wrapper.addEventListener("touchend", ()=>{
-  isDragging=false;
-  window.lastDist=null;
-});
-
-function updateTransform(){
-  stage.style.transform =
-    `translate(${posX}px, ${posY}px) scale(${scale})`;
 }
 
 </script>
