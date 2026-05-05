@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>車庫大賽 穩定最終版</title>
+<title>車庫大賽 最終完整版</title>
 
 <style>
 body{
@@ -32,6 +32,16 @@ button,select{
   height:80vh;
 }
 
+/* 右上角結果 */
+#resultBox{
+  position:absolute;
+  right:20px;
+  top:80px;
+  text-align:left;
+  font-size:18px;
+  line-height:1.8;
+}
+
 /* 整體 */
 #bracket{
   display:flex;
@@ -51,13 +61,13 @@ button,select{
   display:flex;
   flex-direction:column;
   align-items:center;
-  margin-bottom:40px; /* 🔥 關鍵：間距 */
+  margin-bottom:40px;
 }
 
 /* 玩家 */
 .player{
   width:140px;
-  height:36px;        /* 🔥 固定高度 */
+  height:36px;
   line-height:36px;
   margin:4px 0;
   border-radius:8px;
@@ -67,19 +77,14 @@ button,select{
 
 .win{background:#00c853;}
 .lose{background:#444;}
-
-/* 結果 */
-#result{
-  margin-left:50px;
-  font-size:18px;
-  line-height:2;
-}
 </style>
 </head>
 
 <body>
 
 <h1>🏆 車庫大賽</h1>
+
+<div id="resultBox"></div>
 
 <select id="mode">
 <option value="8">8人</option>
@@ -110,6 +115,7 @@ button,select{
 
 let rounds=[];
 let history=[];
+let thirdMatch={p1:null,p2:null,winner:null};
 
 function start(){
 
@@ -126,6 +132,7 @@ function start(){
 
   rounds=[];
   history=[];
+  thirdMatch={p1:null,p2:null,winner:null};
 
   let cur=[...names];
 
@@ -162,8 +169,8 @@ function render(){
       let div=document.createElement("div");
       div.className="match";
 
-      /* 🔥 核心：用 margin 做「金字塔置中」 */
-      div.style.marginTop = (gap===1?0:(gap-1)*40) + "px";
+      /* 金字塔置中 */
+      div.style.marginTop = (gap===1?0:(gap-1)*40)+"px";
 
       div.appendChild(makePlayer(m,"p1"));
       div.appendChild(makePlayer(m,"p2"));
@@ -175,6 +182,7 @@ function render(){
     container.appendChild(col);
   });
 
+  renderThird();
   renderResult();
 }
 
@@ -218,8 +226,94 @@ function propagate(){
         n[idx][slot]=m.winner;
       }
     });
-
   }
+
+  /* 🔥 產生季軍賽 */
+  if(rounds.length>=2){
+    let semi=rounds[rounds.length-2];
+
+    let losers=semi.map(m=>{
+      if(!m.winner)return null;
+      return m.p1===m.winner?m.p2:m.p1;
+    }).filter(x=>x);
+
+    if(losers.length===2){
+      thirdMatch.p1=losers[0];
+      thirdMatch.p2=losers[1];
+    }
+  }
+}
+
+/* 季軍賽 */
+function renderThird(){
+
+  if(!thirdMatch.p1)return;
+
+  let container=document.getElementById("bracket");
+
+  let col=document.createElement("div");
+  col.className="round";
+
+  let title=document.createElement("div");
+  title.innerHTML="🥉 季軍賽";
+  title.style.marginBottom="10px";
+
+  col.appendChild(title);
+
+  let div=document.createElement("div");
+  div.className="match";
+
+  div.appendChild(makeThirdPlayer("p1"));
+  div.appendChild(makeThirdPlayer("p2"));
+
+  col.appendChild(div);
+
+  container.appendChild(col);
+}
+
+function makeThirdPlayer(key){
+
+  let d=document.createElement("div");
+  d.className="player";
+
+  let name=thirdMatch[key];
+  d.innerText=name||"";
+
+  if(thirdMatch.winner){
+    if(name===thirdMatch.winner)d.classList.add("win");
+    else d.classList.add("lose");
+  }
+
+  d.onclick=function(){
+    if(!name)return;
+
+    thirdMatch.winner=name;
+    render();
+  };
+
+  return d;
+}
+
+/* 右上角結果 */
+function renderResult(){
+
+  let box=document.getElementById("resultBox");
+
+  let final=rounds[rounds.length-1][0];
+  if(!final.winner){
+    box.innerHTML="";
+    return;
+  }
+
+  let champion=final.winner;
+  let runner=final.p1===champion?final.p2:final.p1;
+  let third=thirdMatch.winner||"?";
+
+  box.innerHTML=`
+  🥇 冠軍：${champion}<br>
+  🥈 亞軍：${runner}<br>
+  🥉 季軍：${third}
+  `;
 }
 
 function undo(){
@@ -229,34 +323,6 @@ function undo(){
   m.winner=null;
   propagate();
   render();
-}
-
-/* 🏆 結果（放大版） */
-function renderResult(){
-
-  let old=document.getElementById("result");
-  if(old) old.remove();
-
-  let final=rounds[rounds.length-1][0];
-  if(!final.winner)return;
-
-  let div=document.createElement("div");
-  div.id="result";
-
-  let champion=final.winner;
-  let runner=final.p1===champion?final.p2:final.p1;
-
-  let semi=rounds[rounds.length-2];
-  let losers=semi.map(m=>m.p1===m.winner?m.p2:m.p1);
-
-  div.innerHTML=`
-  <h2>🏆 比賽結果</h2>
-  🥇 冠軍：${champion}<br>
-  🥈 亞軍：${runner}<br>
-  🥉 季軍：${losers.join(" / ")}
-  `;
-
-  document.getElementById("bracket").appendChild(div);
 }
 
 </script>
