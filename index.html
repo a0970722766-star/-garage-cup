@@ -2,17 +2,56 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>車庫大賽 Pro 穩定版</title>
+<title>車庫大賽（無線金字塔版）</title>
 
 <style>
-body{margin:0;background:#000;color:#fff;text-align:center;font-family:sans-serif;}
-textarea{width:90%;height:120px;margin:10px;border-radius:10px;}
-button,select{padding:8px;margin:5px;border-radius:8px;border:none;}
+body{
+  margin:0;
+  background:#000;
+  color:#fff;
+  text-align:center;
+  font-family:sans-serif;
+}
 
-#view{overflow:auto;height:70vh;}
-#bracket{position:relative;}
-.match{position:absolute;}
+textarea{
+  width:90%;
+  height:120px;
+  margin:10px;
+  border-radius:10px;
+}
 
+button,select{
+  padding:8px;
+  margin:5px;
+  border-radius:8px;
+  border:none;
+}
+
+#view{
+  overflow:auto;
+  height:80vh;
+}
+
+#bracket{
+  display:flex;
+  align-items:flex-start;
+  padding:20px;
+}
+
+/* 每一輪 */
+.round{
+  display:grid;
+  margin:0 30px;
+}
+
+/* 每一場 */
+.match{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+
+/* 玩家 */
 .player{
   width:140px;
   padding:8px;
@@ -21,10 +60,15 @@ button,select{padding:8px;margin:5px;border-radius:8px;border:none;}
   background:#2ecc71;
   cursor:pointer;
 }
+
 .win{background:#00c853;}
 .lose{background:#444;}
 
-svg{position:absolute;top:0;left:0;pointer-events:none;}
+/* 排名區 */
+#result{
+  margin-left:40px;
+  text-align:left;
+}
 </style>
 </head>
 
@@ -36,14 +80,14 @@ svg{position:absolute;top:0;left:0;pointer-events:none;}
 <option value="8">8人</option>
 <option value="16">16人</option>
 <option value="32">32人</option>
-<option value="48">48人</option>
+<option value="48">48人（循環賽）</option>
 <option value="64">64人</option>
 </select>
 
 <br>
 
-<button id="startBtn">開始</button>
-<button id="undoBtn">撤回</button>
+<button onclick="start()">開始</button>
+<button onclick="undo()">撤回</button>
 
 <textarea id="input">玩家1
 玩家2
@@ -56,22 +100,27 @@ svg{position:absolute;top:0;left:0;pointer-events:none;}
 
 <div id="view">
   <div id="bracket"></div>
-  <svg id="lines"></svg>
 </div>
 
 <script>
-document.getElementById("startBtn").addEventListener("click", start);
 
 let rounds=[];
 let history=[];
 
 function start(){
 
-  const input=document.getElementById("input").value;
-
-  let names=input.split("\n").map(x=>x.trim()).filter(x=>x);
+  let names=document.getElementById("input").value
+    .split("\n")
+    .map(x=>x.trim())
+    .filter(x=>x);
 
   let size=parseInt(document.getElementById("mode").value);
+
+  // ⭐ 48人 → 走循環賽
+  if(size===48){
+    renderRoundRobin(names);
+    return;
+  }
 
   while(names.length<size){
     names.push("玩家"+(names.length+1));
@@ -95,59 +144,50 @@ function start(){
     cur=next;
   }
 
-  render();
+  renderBracket();
 }
 
-function render(){
+function renderBracket(){
 
-  const bracket=document.getElementById("bracket");
-  const lines=document.getElementById("lines");
-
-  bracket.innerHTML="";
-  lines.innerHTML="";
-
-  let colW=200;
-  let rowH=70;
+  let container=document.getElementById("bracket");
+  container.innerHTML="";
 
   rounds.forEach((round,ri)=>{
+
+    let col=document.createElement("div");
+    col.className="round";
+
+    let gap=Math.pow(2,ri);
+
+    col.style.gridTemplateRows = `repeat(${round.length*gap}, 40px)`;
+
     round.forEach((m,mi)=>{
 
-      let x=ricolW;
-      let y=mirowHMath.pow(2,ri);
+      let rowIndex = mi*gap + Math.floor(gap/2);
 
       let div=document.createElement("div");
       div.className="match";
-      div.style.left=x+"px";
-      div.style.top=y+"px";
+      div.style.gridRow = rowIndex;
 
-      div.appendChild(player(m,"p1"));
-      div.appendChild(player(m,"p2"));
+      div.appendChild(makePlayer(m,"p1"));
+      div.appendChild(makePlayer(m,"p2"));
 
-      bracket.appendChild(div);
+      col.appendChild(div);
 
-      if(ri>0){
-        let prev=Math.floor(mi/2);
-
-        drawLine(
-          x-60,
-          prevrowHMath.pow(2,ri-1)+20,
-          x,
-          y+20
-        );
-      }
     });
+
+    container.appendChild(col);
   });
 
-  bracket.style.width=(rounds.length220)+"px";
-  bracket.style.height="2000px";
+  renderResult();
 }
 
-function player(m,key){
+function makePlayer(m,key){
 
   let d=document.createElement("div");
   d.className="player";
 
-  let name=m[key]||"-";
+  let name=m[key]||"";
   d.innerText=name;
 
   if(m.winner){
@@ -155,14 +195,14 @@ function player(m,key){
     else d.classList.add("lose");
   }
 
-  d.onclick=()=>{
-    if(name=="-")return;
+  d.onclick=function(){
+    if(!name)return;
 
     m.winner=name;
     history.push(m);
 
     propagate();
-    render();
+    renderBracket();
   };
 
   return d;
@@ -171,37 +211,85 @@ function player(m,key){
 function propagate(){
 
   for(let i=0;i<rounds.length-1;i++){
+
     let r=rounds[i];
     let n=rounds[i+1];
 
     r.forEach((m,mi)=>{
       if(m.winner){
         let idx=Math.floor(mi/2);
-        let slot=(mi%2===0?"p1":"p2");
+        let slot=mi%2===0?"p1":"p2";
         n[idx][slot]=m.winner;
       }
     });
+
   }
 }
 
-function drawLine(x1,y1,x2,y2){
-
-  let p=document.createElementNS("http://www.w3.org/2000/svg","path");
-
-p.setAttribute("d", `M${x1} ${y1} H${x2-30} V${y2} H${x2}`);
-  p.setAttribute("stroke","#fff");
-  p.setAttribute("fill","none");
-
-  document.getElementById("lines").appendChild(p);
-}
-
-document.getElementById("undoBtn").onclick=()=>{
+function undo(){
   let m=history.pop();
   if(!m)return;
+
   m.winner=null;
   propagate();
-  render();
-};
+  renderBracket();
+}
+
+/* 🏆 冠亞季 */
+function renderResult(){
+
+  let old=document.getElementById("result");
+  if(old) old.remove();
+
+  if(rounds.length===0) return;
+
+  let finalRound=rounds[rounds.length-1][0];
+
+  if(!finalRound.winner) return;
+
+  let result=document.createElement("div");
+  result.id="result";
+
+  let champion=finalRound.winner;
+  let runner=finalRound.p1===champion?finalRound.p2:finalRound.p1;
+
+  // 季軍 = 前一輪輸家
+  let semi=rounds[rounds.length-2];
+  let losers=semi.map(m=>{
+    return m.p1===m.winner?m.p2:m.p1;
+  });
+
+  result.innerHTML=`
+  <h2>🏆 結果</h2>
+  冠軍：${champion}<br>
+  亞軍：${runner}<br>
+  季軍：${losers.join(" / ")}
+  `;
+
+  document.getElementById("bracket").appendChild(result);
+}
+
+/* 🔁 48人循環賽（簡單版） */
+function renderRoundRobin(names){
+
+  let container=document.getElementById("bracket");
+  container.innerHTML="<h2>🔁 循環賽</h2>";
+
+  let table=document.createElement("div");
+
+  names.forEach(a=>{
+    names.forEach(b=>{
+      if(a!==b){
+        let div=document.createElement("div");
+        div.innerText=`${a} vs ${b}`;
+        table.appendChild(div);
+      }
+    });
+  });
+
+  container.appendChild(table);
+}
+
 </script>
 
 </body>
